@@ -15,6 +15,7 @@ setup(
     install_requires=[
         "numpy",
         "torch",
-        "pytorch-ignite"
+        "pytorch-ignite",
+        "attrs"
     ]
 )

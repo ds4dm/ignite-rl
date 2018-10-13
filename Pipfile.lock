@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "03fd7890a545c26657149232c9a6927cf28d847e4553a68157cbb1377a906e71"
+            "sha256": "c5a8ce992700a8b5074400c8d6082795f68c59e59184e4fb1a1348d532e7b128"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -41,6 +41,14 @@
         "ignite-rl": {
             "editable": true,
             "path": "."
+        },
+        "mock": {
+            "hashes": [
+                "sha256:5ce3c71c5545b472da17b72268978914d0252980348636840bd34a00b5cc96c1",
+                "sha256:b158b6df76edd239b8208d481dc46b6afd45a846b7812ff0ce58971cf5bc8bba"
+            ],
+            "index": "pypi",
+            "version": "==2.0.0"
         },
         "more-itertools": {
             "hashes": [
@@ -82,6 +90,13 @@
                 "sha256:ffab5b80bba8c86251291b8ce2e6c99a61446459d4c6637f5d5cc8c9ce37c972"
             ],
             "version": "==1.15.2"
+        },
+        "pbr": {
+            "hashes": [
+                "sha256:1be135151a0da949af8c5d0ee9013d9eafada71237eb80b3ba8896b4f12ec5dc",
+                "sha256:cf36765bf2218654ae824ec8e14257259ba44e43b117fd573c8d07a9895adbdd"
+            ],
+            "version": "==4.3.0"
         },
         "pluggy": {
             "hashes": [
