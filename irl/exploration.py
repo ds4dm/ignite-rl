@@ -25,6 +25,7 @@ import irl.functional as func
 from irl.environment import Observation, BatchedObservations
 from irl.environment import Action, BatchedActions
 from irl.environment import Environment
+from irl.utils import apply_to_tensor
 
 
 @attr.s(auto_attribs=True, frozen=True)
@@ -134,7 +135,7 @@ class Trajectory(
 
 def create_explorer(
     env: Environment,
-    select_action: Callable[[Engine, int], torch.Tensor],
+    select_action: Callable[[Engine, int], Action],
     store_trajectory: bool = False,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
@@ -173,7 +174,7 @@ def create_explorer(
         # Make action.
         next_observation, reward, done, infos = env.step(action)
         next_observation = torch.from_numpy(next_observation) \
-                                .to(dtype=dtype, device=device)
+                                .to(dtype=dtype)
 
         # We create the transition object and store it.
         engine.state.transition = Transition(
@@ -194,21 +195,29 @@ def create_explorer(
                 **attr.asdict(engine.state.transition)
             )
 
-        # Save for next move.
-        engine.state.observation = next_observation
+        # Save for next move
+        if device is not None and torch.device(device).type == "cuda":
+            engine.state.observation = apply_to_tensor(
+                next_observation, lambda t: t.pin_memory())
+        else:
+            engine.state.observation = next_observation
 
         if done:  # Iteration events still fired.
             engine.terminate_epoch()
 
     explorer = Engine(_process_func)
 
-    # Initialization of observation
+    @explorer.on(Events.ITERATION_STARTED)
+    def _move_to_device(engine):
+        engine.state.observation = apply_to_tensor(
+            engine.state.observation,
+            lambda t: t.to(device, non_blocking=True))
+
     @explorer.on(Events.EPOCH_STARTED)
     def _init_episode(engine):
         engine.state.observation = torch.from_numpy(env.reset()) \
                                         .to(dtype=dtype, device=device)
 
-    # Terminaison of environement
     @explorer.on(Events.COMPLETED)
     def _close(engine):
         env.close()

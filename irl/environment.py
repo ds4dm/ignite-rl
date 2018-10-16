@@ -2,16 +2,21 @@
 
 """The Environement base class for reinforcement learning algorithms."""
 
+from collections.abc import Sequence, Mapping
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, Tuple, Dict, Any
 
 import torch
 
 
-Observation = TypeVar("Observation", torch.Tensor, Any)
-BatchedObservations = TypeVar("BatchedObservations", torch.Tensor, Any)
-Action = TypeVar("Action", int, float, torch.Tensor, Any)
-BatchedActions = TypeVar("BatchedActions", int, float, torch.Tensor, Any)
+Observation = TypeVar(
+    "Observation", torch.Tensor, Sequence, Mapping)
+BatchedObservations = TypeVar(
+    "BatchedObservations", torch.Tensor, Sequence, Mapping)
+Action = TypeVar(
+    "Action", int, float, torch.Tensor, Sequence, Mapping)
+BatchedActions = TypeVar(
+    "BatchedActions", int, float, torch.Tensor, Sequence, Mapping)
 
 
 class Environment(Generic[Action, Observation], ABC):
