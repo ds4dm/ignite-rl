@@ -18,14 +18,16 @@ passed to `Trajectory` method to merge observations or actions.
 from typing import List, Union, Callable, Optional, Generic
 
 import attr
+import numpy as np
+import scipy.sparse as sp
 import torch
 from ignite.engine import Engine, Events
 
 import irl.functional as func
+import irl.utils as utils
 from irl.environment import Observation, BatchedObservations
 from irl.environment import Action, BatchedActions
 from irl.environment import Environment
-from irl.utils import apply_to_tensor
 
 
 @attr.s(auto_attribs=True, frozen=True)
@@ -82,28 +84,34 @@ class Trajectory(
 
     def observations(
         self,
-        merge: Callable[[List[Observation]], BatchedObservations] = torch.stack
+        merge: Callable[
+            [List[Observation]], BatchedObservations
+        ] = utils.default_merge
     ) -> BatchedObservations:
         """All observations acted upon stacked together."""
         return merge([t.observation for t in self.transitions])
 
     def actions(
         self,
-        merge: Callable[[List[Action]], BatchedActions] = torch.stack
+        merge: Callable[[List[Action]], BatchedActions] = utils.default_merge
     ) -> BatchedActions:
         """All actions stacked together."""
         return merge([t.action for t in self.transitions])
 
     def next_observations(
         self,
-        merge: Callable[[List[Observation]], BatchedObservations] = torch.stack
+        merge: Callable[
+            [List[Observation]], BatchedObservations
+        ] = utils.default_merge
     ) -> BatchedObservations:
         """All next observations stacked together."""
         return merge([t.next_observation for t in self.transitions])
 
     def all_observations(
         self,
-        merge: Callable[[List[Observation]], BatchedObservations] = torch.stack
+        merge: Callable[
+            [List[Observation]], BatchedObservations
+        ] = utils.default_merge
     ) -> BatchedObservations:
         """All len(self) + 1 observations stacked together.
 
@@ -173,8 +181,11 @@ def create_explorer(
 
         # Make action.
         next_observation, reward, done, infos = env.step(action)
-        next_observation = torch.from_numpy(next_observation) \
-                                .to(dtype=dtype)
+        next_observation = utils.apply_to_type(
+            next_observation,
+            (np.ndarray, sp.spmatrix),
+            utils.from_numpy_sparse
+        ).to(dtype=dtype)
 
         # We create the transition object and store it.
         engine.state.transition = Transition(
@@ -197,7 +208,7 @@ def create_explorer(
 
         # Save for next move
         if device is not None and torch.device(device).type == "cuda":
-            engine.state.observation = apply_to_tensor(
+            engine.state.observation = utils.apply_to_tensor(
                 next_observation, lambda t: t.pin_memory())
         else:
             engine.state.observation = next_observation
@@ -209,7 +220,7 @@ def create_explorer(
 
     @explorer.on(Events.ITERATION_STARTED)
     def _move_to_device(engine):
-        engine.state.observation = apply_to_tensor(
+        engine.state.observation = utils.apply_to_tensor(
             engine.state.observation,
             lambda t: t.to(device, non_blocking=True))
 
