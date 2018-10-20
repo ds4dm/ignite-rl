@@ -226,8 +226,11 @@ def create_explorer(
 
     @explorer.on(Events.EPOCH_STARTED)
     def _init_episode(engine):
-        engine.state.observation = torch.from_numpy(env.reset()) \
-                                        .to(dtype=dtype, device=device)
+        engine.state.observation = utils.apply_to_type(
+            env.reset(),
+            (np.ndarray, sp.spmatrix),
+            utils.from_numpy_sparse
+        ).to(dtype=dtype)
 
     @explorer.on(Events.COMPLETED)
     def _close(engine):

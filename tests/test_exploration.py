@@ -1,11 +1,18 @@
 # coding: utf-8
 
+import gym
 import mock
 import numpy as np
 import pytest
 import torch
 
 from irl.exploration import Transition, Trajectory, create_explorer
+
+
+@pytest.fixture(params=["CartPole-v1", "MountainCar-v0"])
+def env(request) -> gym.Env:
+    """RL environement to test against."""
+    return gym.make(request.param)
 
 
 class Env:
@@ -77,11 +84,24 @@ def test_trajectory(device):
     assert trajectory[0].reward == 0
 
 
-def test_trajectory_merge(device):
-    pytest.skip("NotImplemented")
+def test_trajectory_merge():
+    t = Trajectory()
+    for _ in range(3):
+        t.append(
+            observation="o",
+            action="a",
+            next_observation="no",
+            reward=0,
+            done=False
+        )
+
+    assert t.observations("".join) == "ooo"
+    assert t.actions("".join) == "aaa"
+    assert t.next_observations("".join) == "nonono"
+    assert t.all_observations("".join) == "ooono"
 
 
-def test_explorer():
+def test_explorer_mock():
     select_action = mock.MagicMock()
     select_action.return_value = 1
     explorer = create_explorer(Env(), select_action)
@@ -89,6 +109,21 @@ def test_explorer():
 
     assert select_action.call_count == 22
     assert isinstance(explorer.state.transition, Transition)
+
+
+def test_explorer(env):
+    def select_action(engine, iter):
+        return env.action_space.sample()
+
+    explorer = create_explorer(env, select_action, store_trajectory=True)
+    explorer.run(range(10), 2)
+    traj = explorer.state.trajectory
+
+    assert len(traj) == 10
+    assert isinstance(traj.actions(), torch.Tensor)
+    assert len(traj.actions()) == 10
+    assert isinstance(traj.observations(), torch.Tensor)
+    assert len(traj.observations()) == 10
 
 
 def test_explorer_cast(device):
