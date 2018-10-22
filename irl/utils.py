@@ -5,7 +5,7 @@
 import collections.abc
 from functools import wraps
 from numbers import Number
-from typing import Callable, Sequence, Mapping, Union, Any, TypeVar
+from typing import Callable, Sequence, Mapping, Union, Any, TypeVar, Optional
 
 import numpy as np
 import scipy.sparse as sp
@@ -89,17 +89,19 @@ def apply_to_type(
     return input
 
 
-def from_numpy_sparse(t: Union[np.ndarray, sp.spmatrix]) -> torch.Tensor:
+def from_numpy_sparse(
+    t: Union[np.ndarray, sp.spmatrix], dtype: Optional[torch.dtype] = None
+) -> torch.Tensor:
     """Create a Tensor from numpy array or scipy sparse matrix."""
     if isinstance(t, np.ndarray):
-        return torch.from_numpy(t)
+        return torch.from_numpy(t).to(dtype)
     elif isinstance(t, sp.spmatrix):
         t_coo = t.tocoo(copy=False)
         return torch.sparse_coo_tensor(
             indices=torch.from_numpy(np.vstack((t_coo.row, t_coo.col))),
             values=t_coo.data,
             size=t_coo.shape
-        )
+        ).to(dtype)
     else:
         raise TypeError("Argument of type {t.__class__} is neither a"
                         "numpy array not a scipy sparse matrix.")

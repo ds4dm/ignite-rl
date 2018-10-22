@@ -21,7 +21,7 @@ class Env:
 
     def step(self, action):
         self.cnt += 1
-        obs = np.random.rand(10)
+        obs = {"a": np.random.rand(10), "b": 10}
         return obs, 1., self.cnt > 10, {}
 
     def reset(self):
@@ -50,7 +50,7 @@ def test_transition(device):
 
 def test_explorer_mock():
     select_action = mock.MagicMock()
-    select_action.return_value = 1
+    select_action.return_value = 1, {}
     explorer = create_explorer(Env(), select_action)
     explorer.run(range(100), 2)
 
@@ -60,7 +60,7 @@ def test_explorer_mock():
 
 def test_explorer(env):
     def select_action(engine, iter):
-        return env.action_space.sample()
+        return env.action_space.sample(), {}
 
     explorer = create_explorer(env, select_action)
     explorer.run(range(10), 2)
@@ -68,8 +68,8 @@ def test_explorer(env):
 
 def test_explorer_cast(device):
     explorer = create_explorer(
-        Env(), lambda x, y: None, dtype=torch.float, device=device)
+        Env(), lambda x, y: (None, {}), dtype=torch.float, device=device)
     explorer.run(range(10))
 
-    assert explorer.state.observation.dtype == torch.float
-    assert explorer.state.observation.device == device
+    assert explorer.state.observation["a"].dtype == torch.float
+    assert explorer.state.observation["a"].device == device
