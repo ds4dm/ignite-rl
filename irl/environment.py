@@ -9,15 +9,11 @@ from typing import TypeVar, Generic, Tuple, Dict, Any
 
 import torch
 
+from irl.utils import from_numpy_sparse, apply_to_tensor
 
-Observation = TypeVar(
-    "Observation", torch.Tensor, Sequence, Mapping)
-BatchedObservations = TypeVar(
-    "BatchedObservations", torch.Tensor, Sequence, Mapping)
-Action = TypeVar(
-    "Action", Number, torch.Tensor, Sequence, Mapping)
-BatchedActions = TypeVar(
-    "BatchedActions", Number, torch.Tensor, Sequence, Mapping)
+
+Observation = TypeVar("Observation", torch.Tensor, Sequence, Mapping)
+Action = TypeVar("Action", Number, torch.Tensor, Sequence, Mapping)
 
 
 class Environment(Generic[Action, Observation], ABC):
@@ -77,3 +73,27 @@ class Environment(Generic[Action, Observation], ABC):
     def seed(self, seed=None) -> None:
         """Set random seed for the environement."""
         return NotImplemented
+
+
+class TensorEnv(Environment, Generic[Action, Observation]):
+    """Wraps a numpy environement so it returns Tensors objects."""
+
+    def __init__(self, env):
+        """Initialize object."""
+        self.base_env = env
+
+    def __getattr__(self, name):
+        """All other attributes are gotten from base_env."""
+        return getattr(self.base_env, name)
+
+    def step(
+        self, action: Action
+    ) -> Tuple[Observation, float, bool, Dict[str, Any]]:
+        """Take an action in the environement."""
+        action = apply_to_tensor(lambda t: t.cpu())
+        obs, reward, done, info = self.base_env.step(action)
+        return from_numpy_sparse(obs), reward, done, info
+
+    def reset(self) -> Observation:
+        """Reset the environement."""
+        return from_numpy_sparse(self.base_env.reset())
