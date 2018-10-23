@@ -8,8 +8,9 @@ from numbers import Number
 from typing import TypeVar, Generic, Tuple, Dict, Any
 
 import torch
+import attr
 
-from irl.utils import from_numpy_sparse, apply_to_tensor
+from irl.utils import from_numpy_sparse, apply_to_tensor, apply_to_type
 
 
 Observation = TypeVar("Observation", torch.Tensor, Sequence, Mapping)
@@ -75,12 +76,11 @@ class Environment(Generic[Action, Observation], ABC):
         return NotImplemented
 
 
+@attr.s(auto_attribs=True, frozen=True)
 class TensorEnv(Environment, Generic[Action, Observation]):
     """Wraps a numpy environement so it returns Tensors objects."""
 
-    def __init__(self, env):
-        """Initialize object."""
-        self.base_env = env
+    base_env: Environment
 
     def __getattr__(self, name):
         """All other attributes are gotten from base_env."""
@@ -90,10 +90,18 @@ class TensorEnv(Environment, Generic[Action, Observation]):
         self, action: Action
     ) -> Tuple[Observation, float, bool, Dict[str, Any]]:
         """Take an action in the environement."""
-        action = apply_to_tensor(lambda t: t.cpu())
+        action = apply_to_tensor(action, lambda t: t.cpu().numpy())
         obs, reward, done, info = self.base_env.step(action)
         return from_numpy_sparse(obs), reward, done, info
 
     def reset(self) -> Observation:
         """Reset the environement."""
         return from_numpy_sparse(self.base_env.reset())
+
+    def close(self) -> None:
+        """Close environement."""
+        self.base_env.close()
+
+    def seed(self, seed=None) -> None:
+        """Set random seed for the environement."""
+        self.base_env.seed(seed)

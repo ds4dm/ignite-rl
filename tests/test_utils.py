@@ -47,13 +47,13 @@ def test_apply_to_type():
 def test_from_numpy_sparse():
     x = np.random.rand(10, 10)
     x[x < .7] = 0
-    x_t = utils.from_numpy_sparse(x)
+    x_t = utils._from_numpy_sparse(x)
 
     assert isinstance(x_t, torch.Tensor)
     assert x_t.shape == x.shape
 
     x_sp = sp.csr_matrix(x)
-    x_sp_t = utils.from_numpy_sparse(x_sp)
+    x_sp_t = utils._from_numpy_sparse(x_sp)
     assert isinstance(x_sp_t, torch.Tensor)
     assert x_sp_t.is_sparse
     assert x_sp_t.shape == x_sp.shape

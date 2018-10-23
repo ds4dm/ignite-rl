@@ -19,8 +19,6 @@ from typing import Callable, Optional, Generic, Dict, Any, Tuple
 from functools import partial
 
 import attr
-import numpy as np
-import scipy.sparse as sp
 import torch
 from ignite.engine import Engine, Events
 
@@ -41,7 +39,6 @@ class Transition(
     next_observation: Observation
     reward: float
     done: bool
-    others: Dict[str, Any] = attr.ib(factory=dict)
 
 
 def create_explorer(
@@ -77,26 +74,35 @@ def create_explorer(
         `engine.run(range(max_episode_length), n_episodes)`
 
     """
+    __Transition = None
+
     def _process_func(engine, timestep):
         # Select action.
         action, others = select_action(engine, timestep)
 
+        # update transition class to contain others
+        nonlocal __Transition
+        if __Transition is None:
+            __Transition = attr.make_class(
+                "Transition",
+                list(others.keys()),
+                bases=(Transition, ),
+                frozen=True
+            )
+
         # Make action.
         next_observation, reward, done, infos = env.step(action)
-        next_observation = utils.apply_to_type(
-            next_observation,
-            (np.ndarray, sp.spmatrix),
-            partial(utils.from_numpy_sparse, dtype=dtype)
-        )
+        next_observation = utils.apply_to_tensor(
+            next_observation, lambda t: t.to(dtype))
 
         # We create the transition object and store it.
-        engine.state.transition = Transition(
+        engine.state.transition = __Transition(
             observation=engine.state.observation,
             action=action,
             next_observation=next_observation,
             reward=reward,
             done=done,
-            others=others
+            **others
         )
 
         # Store timestep and info
@@ -123,11 +129,8 @@ def create_explorer(
 
     @explorer.on(Events.EPOCH_STARTED)
     def _init_episode(engine):
-        engine.state.observation = utils.apply_to_type(
-            env.reset(),
-            (np.ndarray, sp.spmatrix),
-            partial(utils.from_numpy_sparse, dtype=dtype)
-        )
+        engine.state.observation = utils.apply_to_tensor(
+            env.reset(), lambda t: t.to(dtype))
 
     @explorer.on(Events.COMPLETED)
     def _close(engine):

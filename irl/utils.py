@@ -5,7 +5,7 @@
 import collections.abc
 from functools import wraps
 from numbers import Number
-from typing import Callable, Sequence, Mapping, Union, Any, TypeVar, Optional
+from typing import Callable, Sequence, Mapping, Union, Any, Optional
 
 import numpy as np
 import scipy.sparse as sp
@@ -13,7 +13,6 @@ import torch
 
 
 Decorator = Callable[[Callable], Callable]
-T = TypeVar("T")
 
 
 def every(steps: int, start: bool = False) -> Decorator:
@@ -55,21 +54,18 @@ def every(steps: int, start: bool = False) -> Decorator:
 
 
 def apply_to_tensor(
-    input: Union[
-        torch.Tensor,
-        Sequence[torch.Tensor],
-        Mapping[Any, torch.Tensor]],
+    input: Union[Any, Sequence, Mapping],
     function: Callable[[torch.Tensor], torch.Tensor]
-) -> Union[torch.Tensor, Sequence[torch.Tensor], Mapping[Any, torch.Tensor]]:
+) -> Union[Any, Sequence, Mapping]:
     """Apply a function on a tensor, a sequence, or a mapping of tensors."""
     return apply_to_type(input, torch.Tensor, function)
 
 
 def apply_to_type(
-    input: T,
+    input: Union[Any, Sequence, Mapping],
     in_type,
-    function: Union[T, Sequence[T], Mapping[Any, T]]
-) -> Union[T, Sequence[T], Mapping[Any, T]]:
+    function: Callable
+) -> Union[Any, Sequence, Mapping]:
     """Apply a function on elements of a given type.
 
     Apply a function on an object of `input_type`, a sequence, or a mapping
@@ -89,7 +85,7 @@ def apply_to_type(
     return input
 
 
-def from_numpy_sparse(
+def _from_numpy_sparse(
     t: Union[np.ndarray, sp.spmatrix], dtype: Optional[torch.dtype] = None
 ) -> torch.Tensor:
     """Create a Tensor from numpy array or scipy sparse matrix."""
@@ -105,6 +101,16 @@ def from_numpy_sparse(
     else:
         raise TypeError("Argument of type {t.__class__} is neither a"
                         "numpy array not a scipy sparse matrix.")
+
+
+def from_numpy_sparse(
+    input: Union[Any, Sequence, Mapping]
+) -> Union[Any, Sequence, Mapping]:
+    """Convert numpy arrays and scipys sparse matrices to Tensors."""
+    return apply_to_type(
+        input,
+        in_type=(np.ndarray, sp.spmatrix),
+        function=_from_numpy_sparse)
 
 
 def default_merge(

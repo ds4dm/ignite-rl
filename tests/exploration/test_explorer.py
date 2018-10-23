@@ -7,12 +7,13 @@ import pytest
 import torch
 
 from irl.exploration.explorer import Transition, create_explorer
+from irl.environment import TensorEnv
 
 
 @pytest.fixture(params=["CartPole-v1", "MountainCar-v0"])
 def env(request) -> gym.Env:
     """RL environement to test against."""
-    return gym.make(request.param)
+    return TensorEnv(gym.make(request.param))
 
 
 class Env:
@@ -68,8 +69,11 @@ def test_explorer(env):
 
 def test_explorer_cast(device):
     explorer = create_explorer(
-        Env(), lambda x, y: (None, {}), dtype=torch.float, device=device)
+        TensorEnv(Env()),
+        lambda x, y: (None, {}),
+        dtype=torch.int,
+        device=device)
     explorer.run(range(10))
 
-    assert explorer.state.observation["a"].dtype == torch.float
+    assert explorer.state.observation["a"].dtype == torch.int
     assert explorer.state.observation["a"].device == device
