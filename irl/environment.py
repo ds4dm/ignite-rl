@@ -10,7 +10,7 @@ from typing import TypeVar, Generic, Tuple, Dict, Any
 import torch
 import attr
 
-from irl.utils import from_numpy_sparse, apply_to_tensor, apply_to_type
+from irl.utils import from_numpy_sparse, apply_to_tensor
 
 
 Observation = TypeVar("Observation", torch.Tensor, Sequence, Mapping)

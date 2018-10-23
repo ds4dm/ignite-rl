@@ -27,12 +27,6 @@ class Model(nn.Module):
             return distrib.Categorical(logits=h)
 
 
-@pytest.fixture(params=["CartPole-v1", "MountainCarContinuous-v0"])
-def env(request) -> gym.Env:
-    """RL environment to test against."""
-    return TensorEnv(gym.make(request.param))
-
-
 @pytest.fixture
 def model(env) -> nn.Module:
     """Policy relevant for the enviornment."""

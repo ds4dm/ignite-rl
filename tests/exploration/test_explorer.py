@@ -10,12 +10,6 @@ from irl.exploration.explorer import Transition, create_explorer
 from irl.environment import TensorEnv
 
 
-@pytest.fixture(params=["CartPole-v1", "MountainCar-v0"])
-def env(request) -> gym.Env:
-    """RL environement to test against."""
-    return TensorEnv(gym.make(request.param))
-
-
 class Env:
     def __init__(self):
         self.cnt = 0
