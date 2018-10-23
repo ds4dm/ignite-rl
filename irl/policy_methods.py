@@ -1,5 +1,7 @@
 # coding: utf-8
 
+"""Collection of policy learning algorithms."""
+
 from typing import Optional
 
 import torch
@@ -17,12 +19,39 @@ def create_reinforce(
     env: Environment,
     model: nn.Module,
     optimizer: optim.Optimizer,
-    discount: float = .95,
+    discount: float = .99,
     exploration: float = .001,
     grad_norm_clip: Optional[float] = 1.,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> Engine:
+    """Create an agent using Reinforce learning algorithm.
+
+    Parameters
+    ----------
+    env:
+        The environment the agent interacts with.
+    model:
+        The neural network used to model the policy.
+    optimizer:
+        The optimizer used to update the `model` parameters.
+    discount:
+        The discount rate used for computing the returns.
+    exploration:
+        The entropy bonus for encouraging exploration.
+    grad_norm_clip:
+        Value to clip the norm of the gradient at before applying an update.
+    dtype:
+        Type the obseravtions/model are casted to.
+    device:
+        Device the model runs on.
+
+    Returns
+    -------
+    agent:
+        The ignite engine, exploring the environement and optimizing.
+
+    """
     if device is not None:
         model.to(device, dtype)
 
