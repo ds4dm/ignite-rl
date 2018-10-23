@@ -5,7 +5,7 @@
 Data point are related to transition and trajectories.
 """
 
-from typing import List, Union, Callable, Generic, TypeVar, Optional
+from typing import List, Union, Callable, Generic, TypeVar, Optional, Iterator
 
 import attr
 from torch.utils.data import Dataset
@@ -33,11 +33,14 @@ class Trajectories(Dataset, Generic[Data]):
         Transformation to apply on new trajectories added.
     data:
         A list of all transformed transitions.
+    partial_trajectory:
+        A buffer to put transitions, waiting for the episode to terminate.
 
     """
 
     trajectory_transform: TrajectoryTransform = lambda x: x
     data: List[Data] = attr.ib(factory=list)
+    partial_trajectory: List[Transition] = attr.ib(factory=list)
 
     def __getitem__(
         self, idx: Union[int, slice]
@@ -53,9 +56,28 @@ class Trajectories(Dataset, Generic[Data]):
         """Length of the trajectory."""
         return len(self.data)
 
+    def __iter__(self) -> Iterator[Data]:
+        """Iterate over the data.
+
+        Method defined for when using a Dataloder is overkill.
+        """
+        return iter(self.data)
+
     def concat(self, trajectory: List[Transition]) -> None:
         """Add a new trajectory to the dataset."""
         self.data[len(self.data):] = self.trajectory_transform(trajectory)
+
+    def append(self, transition: Transition) -> None:
+        """Append a single transition.
+
+        Stage the transition in the buffer `partial_trajectory`, when `done` is
+        observed on a transition, the episode is assume to be over. The
+        trajectory is passed to `concat` and the buffer in cleared.
+        """
+        self.partial_trajectory.append(transition)
+        if transition.done:
+            self.concat(self.partial_trajectory)
+            self.partial_trajectory.clear()
 
     def clear(self) -> None:
         """Empty the dataset."""
@@ -98,6 +120,13 @@ class MemoryReplay(Dataset, Generic[Data]):
     def __len__(self) -> int:
         """Length of the trajectory."""
         return len(self.data)
+
+    def __iter__(self) -> Iterator[Data]:
+        """Iterate over the data.
+
+        Method defined for when using a Dataloder is overkill.
+        """
+        return iter(self.data)
 
     def append(self, transition: Transition) -> None:
         """Add a transition to the dataset."""
