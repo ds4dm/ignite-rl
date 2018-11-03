@@ -19,18 +19,21 @@ def value_td_residuals(
     return rewards + (discount * next_values) - values
 
 
-def discounted_sum(x: torch.Tensor, discount: float) -> torch.Tensor:
+def discounted_sum(
+    X: torch.Tensor, discount: float, last: float = 0.
+) -> torch.Tensor:
     """Compute a discounted sum for every element.
 
     Given a one dimension input `x` of size `n`, the output tensor has size `n`
     where every output is given by:
         out[j] = sum_{0 <= i < n-j} x[i+j] * discount**j
     """
-    n = len(x)
-    powers = torch.arange(n, device=x.device, dtype=x.dtype)
-    kernel = float(discount) ** powers
-    returns = F.conv1d(x.view(1, 1, -1), kernel.view(1, 1, -1), padding=n-1)
-    return returns.squeeze()[n-1:]
+    outputs = []
+    d = last
+    for x in X[::-1]:
+        d = discount * d + x
+        outputs.append(d)
+    return torch.tensor(outputs[::-1], dtype=torch.float, device=X.device)
 
 
 def returns(rewards: torch.Tensor, discount: float) -> torch.Tensor:
