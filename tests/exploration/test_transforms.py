@@ -23,3 +23,4 @@ def test_WithReturns():
     assert isinstance(transformed, list)
     assert len(transformed) == len(trajectory)
     assert hasattr(transformed[0], "retrn")
+    assert all(isinstance(t.retrn, float) for t in transformed)

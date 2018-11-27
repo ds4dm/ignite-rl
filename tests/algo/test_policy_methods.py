@@ -64,7 +64,7 @@ def test_reinforce(device, env, model):
         dtype=torch.float32
     )
 
-    agent.run(range(10), 2)
+    agent.run(range(100), 2)
 
 
 def test_a2c(device, env, model):

@@ -88,6 +88,7 @@ def create_reinforce(
 
     @agent.on(Events.EPOCH_COMPLETED)
     def optimize(engine):
+        engine.state.trajectories.terminate_trajectory()
         # The setting is simple enough that using a dataloader is overkill.
         optimizer.zero_grad()
         for transition in engine.state.trajectories:
@@ -182,12 +183,14 @@ def create_a2c(
 
     @agent.on(Events.EPOCH_COMPLETED)
     def optimize(engine):
+        engine.state.trajectories.terminate_trajectory()
         # The setting is simple enough that using a dataloader is overkill.
         optimizer.zero_grad()
         for t in engine.state.trajectories:
             loss = -(t.retrn - t.critic_value.detach()) * t.log_prob
             loss -= exploration * t.entropy
-            loss += critic_multiplier * critic_loss(t.critic_value, t.retrn)
+            retrn = t.critic_value.new([t.retrn])  # Make tensor on same device
+            loss += critic_multiplier * critic_loss(t.critic_value, retrn)
             loss.backward()
 
         if grad_norm_clip is not None:
