@@ -36,9 +36,14 @@ def discounted_sum(
     return torch.tensor(outputs[::-1], dtype=torch.float, device=X.device)
 
 
-def returns(rewards: torch.Tensor, discount: float) -> torch.Tensor:
-    """Compute the disounted returns given the rewards."""
-    return discounted_sum(rewards, discount)
+def returns(
+    rewards: torch.Tensor, discount: float, last: float = 0.
+) -> torch.Tensor:
+    """Compute the disounted returns given the rewards.
+
+    This is equivalent to `discoutned_sum`.
+    """
+    return discounted_sum(rewards, discount=discount, last=last)
 
 
 def normalize_1d(x: torch.Tensor) -> torch.Tensor:
@@ -58,7 +63,8 @@ def generalize_advatange_estimation(
     The discounted sum of TD residuals as described in the generalized advatage
     estimation paper: http://arxiv.org/abs/1506.02438
     """
-    v_td_residuals = value_td_residuals(rewards, values, discount)
+    v_td_residuals = value_td_residuals(
+        rewards, values[:-1], values[1:], discount=discount)
     return discounted_sum(v_td_residuals, discount*lambda_)
 
 
