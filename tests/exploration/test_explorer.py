@@ -1,10 +1,10 @@
 # coding: utf-8
 
-import gym
 import mock
 import numpy as np
-import pytest
 import torch
+
+from ignite.engine import Events
 
 from irl.exploration.explorer import Transition, create_explorer
 from irl.environment import TensorEnv
@@ -70,4 +70,8 @@ def test_explorer_cast(device):
     explorer.run(range(10))
 
     assert explorer.state.observation["a"].dtype == torch.int
-    assert explorer.state.observation["a"].device == device
+
+    # Observation are casted lazily
+    @explorer.on(Events.ITERATION_STARTED)
+    def _test(engine):
+        assert engine.state.observation["a"].device == device

@@ -9,7 +9,7 @@ import gym
 from irl.environment import TensorEnv
 
 
-@pytest.fixture(params=["cpu", "cuda"])
+@pytest.fixture(params=["cpu", "cuda:0"])
 def device(request) -> torch.device:
     """Device to run code on."""
     _device = torch.device(request.param)
