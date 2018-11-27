@@ -7,7 +7,7 @@ import torch
 from ignite.engine import Events
 
 from irl.exploration.explorer import Transition, create_explorer
-from irl.environment import TensorEnv
+from irl.exploration.environment import TensorEnv
 
 
 class Env:

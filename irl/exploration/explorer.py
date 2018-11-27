@@ -22,9 +22,7 @@ import torch
 from ignite.engine import Engine, Events
 
 import irl.utils as utils
-from irl.environment import Observation
-from irl.environment import Action
-from irl.environment import Environment
+from .environment import Observation, Action, Environment
 
 
 @attr.s(auto_attribs=True, frozen=True)

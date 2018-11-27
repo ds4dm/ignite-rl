@@ -7,7 +7,7 @@ import torch.optim as optim
 import torch.distributions as distrib
 import pytest
 
-from irl.policy_methods import create_reinforce
+from irl.algo.policy_methods import create_reinforce
 
 
 class Model(nn.Module):

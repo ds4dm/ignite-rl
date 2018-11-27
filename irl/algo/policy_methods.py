@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from ignite.engine import Engine, Events
 
-from irl.environment import Environment
+from irl.exploration.environment import Environment
 from irl.exploration.explorer import create_explorer
 from irl.exploration.datasets import Trajectories
 import irl.exploration.transforms as transforms
