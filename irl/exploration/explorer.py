@@ -92,7 +92,7 @@ def create_explorer(
         # Make action.
         next_observation, reward, done, infos = env.step(action)
         next_observation = utils.apply_to_tensor(
-            next_observation, lambda t: t.to(dtype))
+            next_observation, lambda t: t.to(dtype=dtype))
 
         # We create the transition object and store it.
         engine.state.transition = __Transition(
@@ -124,12 +124,12 @@ def create_explorer(
     def _move_to_device(engine):
         engine.state.observation = utils.apply_to_tensor(
             engine.state.observation,
-            lambda t: t.to(device, non_blocking=True))
+            lambda t: t.to(device=device, non_blocking=True))
 
     @explorer.on(Events.EPOCH_STARTED)
     def _init_episode(engine):
         engine.state.observation = utils.apply_to_tensor(
-            env.reset(), lambda t: t.to(dtype))
+            env.reset(), lambda t: t.to(dtype=dtype))
 
     @explorer.on(Events.COMPLETED)
     def _close(engine):
