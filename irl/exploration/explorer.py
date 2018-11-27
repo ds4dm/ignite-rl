@@ -15,8 +15,7 @@ free to define their own types. For these particluar cases, a function can be
 passed to `Trajectory` method to merge observations or actions.
 """
 
-from typing import Callable, Optional, Generic, Dict, Any, Tuple
-from functools import partial
+from typing import Callable, Optional, Generic, Dict, Tuple
 
 import attr
 import torch

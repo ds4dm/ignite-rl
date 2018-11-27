@@ -7,7 +7,6 @@ import torch.optim as optim
 import torch.distributions as distrib
 import pytest
 
-from irl.environment import TensorEnv
 from irl.policy_methods import create_reinforce
 
 

@@ -1,7 +1,6 @@
 # coding:utf-8
 
 import torch
-import pytest
 import numpy as np
 
 import irl.functional as Firl
