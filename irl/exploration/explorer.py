@@ -25,7 +25,7 @@ import irl.utils as utils
 from .environment import Observation, Action, Environment
 
 
-@attr.s(auto_attribs=True, frozen=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class Transition(
     Generic[Observation, Action]
 ):
@@ -84,7 +84,8 @@ def create_explorer(
                 "Transition",
                 list(others.keys()),
                 bases=(Transition, ),
-                frozen=True
+                frozen=True,
+                slots=True
             )
 
         # Make action.
