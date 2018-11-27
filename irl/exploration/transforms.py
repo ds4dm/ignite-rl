@@ -42,5 +42,5 @@ class WithReturns:
                 slots=True
             )
 
-        return [self._Transition(**attr.asdict(x), retrn=r.item())
-                for x, r in zip(trajectory, returns)]
+        return [self._Transition(**attr.asdict(x), retrn=r)
+                for x, r in zip(trajectory, returns.tolist())]
