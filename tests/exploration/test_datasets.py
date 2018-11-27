@@ -17,6 +17,9 @@ def test_Trajectories():
     assert len(ds) == 3
     assert len(ds.partial_trajectory) == 1
     ds.append(Trans(5, True))
+    assert len(ds.partial_trajectory) == 2
+    assert len(ds) == 3
+    ds.terminate_trajectory()
     assert len(ds) == 5
     assert len(ds.partial_trajectory) == 0
 
