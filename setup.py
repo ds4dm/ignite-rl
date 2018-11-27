@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="Ignite-Rl",
+    name="ignite-rl",
     version="0.1",
     packages=find_packages(),
     author="Antoine Prouvost",
