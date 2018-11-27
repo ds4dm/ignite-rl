@@ -39,14 +39,15 @@ class Trajectories(Dataset, Generic[Data]):
     """
 
     trajectory_transform: TrajectoryTransform = lambda x: x
-    data: List[Data] = attr.ib(factory=list)
-    partial_trajectory: List[Transition] = attr.ib(factory=list)
+
+    data: List[Data] = attr.ib(init=False, factory=list)
+    partial_trajectory: List[Transition] = attr.ib(init=False, factory=list)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.transitions[idx]
+        selected = self.data[idx]
         if isinstance(selected, list):
             return Trajectories(self.trajectory_transform, selected)
         else:
@@ -82,6 +83,7 @@ class Trajectories(Dataset, Generic[Data]):
     def clear(self) -> None:
         """Empty the dataset."""
         self.data.clear()
+        self.partial_trajectory.clear()
 
 
 @attr.s(auto_attribs=True)
@@ -105,13 +107,14 @@ class MemoryReplay(Dataset, Generic[Data]):
 
     transform: Transform = lambda x: x
     capacity: Optional[int] = None
-    data: List[Data] = attr.ib(factory=list)
+
+    data: List[Data] = attr.ib(init=False, factory=list)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.transitions[idx]
+        selected = self.data[idx]
         if isinstance(selected, list):
             return MemoryReplay(self.transform, selected)
         else:
@@ -132,7 +135,7 @@ class MemoryReplay(Dataset, Generic[Data]):
         """Add a transition to the dataset."""
         self.data.append(self.transform(transition))
         if self.capacity is not None and len(self) > self.capacity:
-            self.data.pop()
+            self.data.pop(0)
 
     def clear(self) -> None:
         """Empty the dataset."""
