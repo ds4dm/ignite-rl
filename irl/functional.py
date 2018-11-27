@@ -30,7 +30,7 @@ def discounted_sum(
     """
     outputs = []
     d = last
-    for x in X[::-1]:
+    for x in X.cpu().numpy()[::-1]:
         d = discount * d + x
         outputs.append(d)
     return torch.tensor(outputs[::-1], dtype=torch.float, device=X.device)
