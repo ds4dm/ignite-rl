@@ -3,7 +3,6 @@
 """The Environement base class for reinforcement learning algorithms."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence, Mapping
 from numbers import Number
 from typing import TypeVar, Generic, Tuple, Dict, Any
 
@@ -11,10 +10,10 @@ import torch
 import attr
 
 from irl.utils import from_numpy_sparse, apply_to_tensor
+from .data import Data
 
-
-Observation = TypeVar("Observation", torch.Tensor, Sequence, Mapping)
-Action = TypeVar("Action", Number, torch.Tensor, Sequence, Mapping)
+Observation = TypeVar("Observation", torch.Tensor, Data)
+Action = TypeVar("Action", Number, torch.Tensor, Data)
 
 
 class Environment(Generic[Action, Observation], ABC):

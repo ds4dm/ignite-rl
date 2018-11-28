@@ -22,11 +22,12 @@ import torch
 from ignite.engine import Engine, Events
 
 from .environment import Observation, Action, Environment
+from .data import Data
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class Transition(
-    Generic[Observation, Action]
+    Data, Generic[Observation, Action]
 ):
     """An observed Transition in the environment."""
 
@@ -84,7 +85,7 @@ def create_explorer(
                 list(others.keys()),
                 bases=(Transition, ),
                 frozen=True,
-                slots=True
+                slots=True,
             )
 
         # Make action.
