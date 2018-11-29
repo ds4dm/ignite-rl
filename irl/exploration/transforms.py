@@ -1,5 +1,7 @@
 # coding: utf-8
 
+"""Dataset transforms."""
+
 from functools import reduce, partial
 from typing import Callable, List, Any
 
@@ -14,14 +16,14 @@ def compose(*transforms: Callable) -> Callable:
     return partial(reduce, lambda x, f: f(x), transforms)
 
 
+@attr.s(auto_attribs=True)
 class WithReturns:
     """Transform class to add a the return to every item."""
 
-    def __init__(self, discount: float, normalize: bool = True) -> None:
-        """Initialise object."""
-        self.discount = discount
-        self.normalize = normalize
-        self.__Transition = None
+    discount: float = .9
+    normalize: bool = True
+
+    _Transition: type = attr.ib(init=False)
 
     def __call__(self, trajectory: List[Any]) -> List[Any]:
         """Add the return to every item in the trajectory."""
@@ -31,13 +33,14 @@ class WithReturns:
         if self.normalize:
             returns = Firl.normalize_1d(returns)
 
-        if self.__Transition is None:
-            self.__Transition = attr.make_class(
-                "Transition",
+        if not hasattr(self, "_Transition"):
+            self._Transition = attr.make_class(
+                trajectory[0].__class__.__name__,
                 ["retrn"],
                 bases=(trajectory[0].__class__, ),
-                frozen=True
+                frozen=True,
+                slots=True
             )
 
-        return [self.__Transition(**attr.asdict(x), retrn=r)
-                for x, r in zip(trajectory, returns)]
+        return [self._Transition(**attr.asdict(x), retrn=r)
+                for x, r in zip(trajectory, returns.tolist())]

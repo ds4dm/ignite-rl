@@ -1,13 +1,11 @@
 # coding: utf-8
 
 import mock
-import numpy as np
 import torch
 
 from ignite.engine import Events
 
 from irl.exploration.explorer import Transition, create_explorer
-from irl.environment import TensorEnv
 
 
 class Env:
@@ -16,12 +14,12 @@ class Env:
 
     def step(self, action):
         self.cnt += 1
-        obs = {"a": np.random.rand(10), "b": 10}
+        obs = torch.rand(10)
         return obs, 1., self.cnt > 10, {}
 
     def reset(self):
         self.cnt = 0
-        return np.random.rand(10)
+        return torch.rand(10)
 
     def close(self):
         pass
@@ -63,15 +61,13 @@ def test_explorer(env):
 
 def test_explorer_cast(device):
     explorer = create_explorer(
-        TensorEnv(Env()),
+        Env(),
         lambda x, y: (None, {}),
         dtype=torch.int,
         device=device)
     explorer.run(range(10))
 
-    assert explorer.state.observation["a"].dtype == torch.int
-
     # Observation are casted lazily
     @explorer.on(Events.ITERATION_STARTED)
     def _test(engine):
-        assert engine.state.observation["a"].device == device
+        assert engine.state.observation.device == device

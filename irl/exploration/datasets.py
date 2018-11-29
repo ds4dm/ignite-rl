@@ -39,14 +39,15 @@ class Trajectories(Dataset, Generic[Data]):
     """
 
     trajectory_transform: TrajectoryTransform = lambda x: x
-    data: List[Data] = attr.ib(factory=list)
-    partial_trajectory: List[Transition] = attr.ib(factory=list)
+
+    data: List[Data] = attr.ib(init=False, factory=list)
+    partial_trajectory: List[Transition] = attr.ib(init=False, factory=list)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.transitions[idx]
+        selected = self.data[idx]
         if isinstance(selected, list):
             return Trajectories(self.trajectory_transform, selected)
         else:
@@ -70,18 +71,26 @@ class Trajectories(Dataset, Generic[Data]):
     def append(self, transition: Transition) -> None:
         """Append a single transition.
 
-        Stage the transition in the buffer `partial_trajectory`, when `done` is
-        observed on a transition, the episode is assume to be over. The
-        trajectory is passed to `concat` and the buffer in cleared.
+        Stage the transition in the buffer `partial_trajectory`. Use
+        `terminate_trajectory` to signal start a new trajectory.
         """
         self.partial_trajectory.append(transition)
-        if transition.done:
-            self.concat(self.partial_trajectory)
-            self.partial_trajectory.clear()
+
+    def terminate_trajectory(self) -> None:
+        """Terminate a partial trajectory.
+
+        When the episode is assume to be over, call this method.
+        The trajectory is passed to `concat` and the buffer in cleared.
+        Note: this is different from `done` in environement because one may
+        truncate the episode before a terminal state.
+        """
+        self.concat(self.partial_trajectory)
+        self.partial_trajectory.clear()
 
     def clear(self) -> None:
         """Empty the dataset."""
         self.data.clear()
+        self.partial_trajectory.clear()
 
 
 @attr.s(auto_attribs=True)
@@ -105,13 +114,14 @@ class MemoryReplay(Dataset, Generic[Data]):
 
     transform: Transform = lambda x: x
     capacity: Optional[int] = None
-    data: List[Data] = attr.ib(factory=list)
+
+    data: List[Data] = attr.ib(init=False, factory=list)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.transitions[idx]
+        selected = self.data[idx]
         if isinstance(selected, list):
             return MemoryReplay(self.transform, selected)
         else:
@@ -132,7 +142,7 @@ class MemoryReplay(Dataset, Generic[Data]):
         """Add a transition to the dataset."""
         self.data.append(self.transform(transition))
         if self.capacity is not None and len(self) > self.capacity:
-            self.data.pop()
+            self.data.pop(0)
 
     def clear(self) -> None:
         """Empty the dataset."""

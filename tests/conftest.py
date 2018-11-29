@@ -6,7 +6,7 @@ import pytest
 import torch
 import gym
 
-from irl.environment import TensorEnv
+from irl.exploration.environment import TensorEnv
 
 
 @pytest.fixture(params=["cpu", "cuda:0"])
