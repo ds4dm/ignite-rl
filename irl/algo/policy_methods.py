@@ -11,7 +11,7 @@ import torch.optim as optim
 from ignite.engine import Engine, Events
 
 from irl.exploration.environment import Environment
-from irl.exploration.explorer import create_explorer
+from irl.exploration.explorer import Explorer
 from irl.exploration.datasets import Trajectories
 import irl.exploration.transforms as transforms
 
@@ -56,22 +56,24 @@ def create_reinforce(
     if device is not None:
         model.to(device, dtype)
 
-    def select_action(engine, timestep):
+    def select_action(engine: Explorer, observation):
         model.train()
-        action_distrib = model(engine.state.observation)
+        action_distrib = model(observation)
         action = action_distrib.sample()
-        others = {
-            "log_prob": action_distrib.log_prob(action),
-            "entropy": action_distrib.entropy()
-        }
-        return action, others
+        engine.store_transition_members(
+            log_prob=action_distrib.log_prob(action),
+            entropy=action_distrib.entropy()
+        )
+        return action
 
-    agent = create_explorer(
+    agent = Explorer(
         env=env,
         select_action=select_action,
         dtype=dtype,
         device=device
     )
+
+    agent.register_transition_members("log_prob", "entropy")
 
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
@@ -150,23 +152,25 @@ def create_a2c(
     if device is not None:
         model.to(device, dtype)
 
-    def select_action(engine, timestep):
+    def select_action(engine, observation):
         model.train()
-        action_distrib, critic_value = model(engine.state.observation)
+        action_distrib, critic_value = model(observation)
         action = action_distrib.sample()
-        others = {
-            "log_prob": action_distrib.log_prob(action),
-            "entropy": action_distrib.entropy(),
-            "critic_value": critic_value
-        }
-        return action, others
+        engine.store_transition_members(
+            log_prob=action_distrib.log_prob(action),
+            entropy=action_distrib.entropy(),
+            critic_value=critic_value
+        )
+        return action
 
-    agent = create_explorer(
+    agent = Explorer(
         env=env,
         select_action=select_action,
         dtype=dtype,
         device=device
     )
+
+    agent.register_transition_members("log_prob", "entropy", "critic_value")
 
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
