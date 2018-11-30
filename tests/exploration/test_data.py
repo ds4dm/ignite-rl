@@ -34,6 +34,12 @@ def test_apply():
     assert m.call_count == 2
 
 
+def test_pin_memory(device):
+    if device.type == "cuda":
+        d = attr.evolve(Example(), a=torch.sparse.FloatTensor())
+        d.pin_memory()
+
+
 def test_get_batched_class():
     BatchClass = Example.get_batch_class()
     assert len(attr.fields(BatchClass)) == 3

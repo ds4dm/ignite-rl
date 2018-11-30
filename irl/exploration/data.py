@@ -33,7 +33,14 @@ class Data:
 
     def pin_memory(self) -> "Data":
         """Move the underlying tensors to pinned memory."""
-        return self.apply(lambda x: x.pin_memory())
+        def mapper(t):
+            # Cannot pin memory of sparse tensor
+            if isinstance(t, torch.Tensor) and t.is_sparse:
+                return t
+            else:
+                return t.pin_memory()
+
+        return self.apply(mapper)
 
     def share_memory_(self) -> "Data":
         """Move the underlying tensors to shared memory."""
