@@ -15,7 +15,7 @@ free to define their own types. For these particluar cases, a function can be
 passed to `Trajectory` method to merge observations or actions.
 """
 
-from typing import Callable, Optional, Generic, Dict, Tuple
+from typing import Callable, Optional, Generic
 
 import attr
 import torch
@@ -60,7 +60,7 @@ class Explorer(Engine):
     def __init__(
         self,
         env: Environment,
-        select_action: Callable[[Engine, int], Tuple[Action, Dict]],
+        select_action: Callable[[Engine, Observation], Action],
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
     ) -> Engine:
