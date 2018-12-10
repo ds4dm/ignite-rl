@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 
 [dev-packages]
-pytest = "*"
 ignite-rl = {editable = true, path = "."}
 mock = "*"
 gym = "*"
+pytest = "*"
