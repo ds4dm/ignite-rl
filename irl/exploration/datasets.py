@@ -111,6 +111,19 @@ class Trajectories(Dataset, Generic[Data]):
         with self.par_traj_lock.writer():
             self.partial_trajectory.clear()
 
+    def shared_trajectories(self) -> "Trajectories":
+        """Return a new `Trajectories` sharing underlying data.
+
+        The new `Trajectories` share the same `data` and `data_lock` but has a
+        separate mechanism for partial trajectory. This is useful for parallel
+        actors populating a same dataset.
+        """
+        shared = Trajectories(trajectory_transform=self.trajectory_transform)
+        with self.data_lock.reader():
+            shared.data = self.data
+            shared.data_lock = self.data_lock
+        return shared
+
 
 @attr.s(auto_attribs=True)
 class MemoryReplay(Dataset, Generic[Data]):
