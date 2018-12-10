@@ -38,96 +38,147 @@ class Transition(
     done: bool
 
 
-def create_explorer(
-    env: Environment,
-    select_action: Callable[[Engine, int], Tuple[Action, Dict]],
-    dtype: Optional[torch.dtype] = None,
-    device: Optional[torch.device] = None,
-) -> Engine:
-    """Create an ignite engine to explore the environment.
+class Explorer(Engine):
+    """Environement Explorer.
 
-    Parameters
-    ----------
-    env:
-        The environment to explore.
-    select_action:
-        A function used to select an action. Has access to the engine and the
-        iteration number. The current observation is stored under
-        `engine.state.observation`. Takes as input the ingine and the iteration
-        number, returns the action passed to the environement, along with a
-        dictionary (possibly empty) of other variable to remember.
-    dtype:
-        Type to cast observations in.
-    device:
-        Device to move observations to before passing it to the `select_action`
-        function.
+    An ignite Engine that will explore the environment according to the
+    given policy. Handlers can be added by the user to perform
+    different algorithms of reinforcement learning. Run with
+    `engine.run(range(max_episode_length), n_episodes)`.
 
-    Returns
-    -------
-    explorer:
-        An ignite Engine that will explore the environment according to the
-        given policy. Handlers can be added by the user to perform different
-        algorithms of reinforcement learning. Run with
-        `engine.run(range(max_episode_length), n_episodes)`
-
+    Exposes the following attributes in the state of the engine:
+    episode_timestep:
+        The time step in the current episode.
+    transition:
+        An object with all the information necessary for learning.
+    environment_info:
+        The extra information passed by the environment.
+    observation:
+        The current observation, moved accross devices.
     """
-    __Transition = None
 
-    def _process_func(engine, timestep):
-        # Select action.
-        action, others = select_action(engine, timestep)
+    def __init__(
+        self,
+        env: Environment,
+        select_action: Callable[[Engine, int], Tuple[Action, Dict]],
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[torch.device] = None,
+    ) -> Engine:
+        """Initialize an ignite engine to explore the environment.
 
-        # update transition class to contain others
-        nonlocal __Transition
-        if __Transition is None:
-            __Transition = attr.make_class(
+        Parameters
+        ----------
+        env:
+            The environment to explore.
+        select_action:
+            A function used to select an action. Has access to the engine and
+            the iteration number. The current observation is stored under
+            `engine.state.observation`. Takes as input the ingine and the
+            iteration number, returns the action passed to the environement,
+            along with a dictionary (possibly empty) of other variable to
+            remember.
+        dtype:
+            Type to cast observations in.
+        device:
+            Device to move observations to before passing it to the
+            `select_action` function.
+
+        """
+        def _process_func(engine, timestep):
+            # Store timestep for user
+            engine.state.episode_timestep = timestep
+
+            # Select action.
+            action = select_action(engine, engine.state.observation)
+
+            # Make action.
+            next_observation, reward, done, infos = env.step(action)
+            next_observation = next_observation.to(dtype=dtype)
+
+            # We create the transition object and store it.
+            engine.state.transition = engine.state.TransitionClass(
+                observation=engine.state.observation,
+                action=action,
+                next_observation=next_observation,
+                reward=reward,
+                done=done,
+                **getattr(engine.state, "extra_transition_members", {})
+            )
+            # Cleaning to avoid exposing unecessary information
+            if hasattr(engine.state, "extra_transition_members"):
+                del engine.state.extra_transition_members
+
+            # Store info for user
+            engine.state.environment_info = infos
+
+            # Save for next move
+            if device is not None and torch.device(device).type == "cuda":
+                engine.state.observation = next_observation.pin_memory()
+            else:
+                engine.state.observation = next_observation
+
+            if done:  # Iteration events still fired.
+                engine.terminate_epoch()
+
+        super().__init__(_process_func)
+
+        @self.on(Events.STARTED)
+        def _store_TransitionClass(engine):
+            engine.state.TransitionClass = Transition
+
+        @self.on(Events.ITERATION_STARTED)
+        def _move_to_device(engine):
+            engine.state.observation = engine.state.observation.to(
+                device=device, non_blocking=True)
+
+        @self.on(Events.EPOCH_STARTED)
+        def _init_episode(engine):
+            engine.state.observation = env.reset().to(dtype=dtype)
+
+        @self.on(Events.COMPLETED)
+        def _close(engine):
+            env.close()
+
+    def register_transition_members(
+        engine,
+        *names: str,
+        **name_attribs
+    ) -> None:
+        """Register extra members to be stored in the transition object.
+
+        At every step, the method `store_transition_members` must be called
+        to store the extra members.
+
+        Parameters
+        ----------
+        names:
+            Names of the parameters to register.
+        name_attribs:
+            Named parameters along with an `attr.ib` object (to have specific
+            behaviour such as converters).
+
+        """
+        @engine.on(Events.STARTED)
+        def _(engine):
+            engine.state.TransitionClass = attr.make_class(
                 "Transition",
-                list(others.keys()),
-                bases=(Transition, ),
+                {**{n: attr.ib() for n in names}, **name_attribs},
+                bases=(engine.state.TransitionClass, ),
                 frozen=True,
                 slots=True,
             )
 
-        # Make action.
-        next_observation, reward, done, infos = env.step(action)
-        next_observation = next_observation.to(dtype=dtype)
+    def store_transition_members(engine, **members) -> None:
+        """Store transition members.
 
-        # We create the transition object and store it.
-        engine.state.transition = __Transition(
-            observation=engine.state.observation,
-            action=action,
-            next_observation=next_observation,
-            reward=reward,
-            done=done,
-            **others
-        )
+        Store the value of the transition members (registered with
+        `register_transition_members`) to be added in the next transition.
 
-        # Store timestep and info
-        engine.state.episode_timestep = timestep
-        engine.state.environment_info = infos
+        Parameters
+        ----------
+        members:
+            Named parameters with the name of the register members, and its
+            value.
 
-        # Save for next move
-        if device is not None and torch.device(device).type == "cuda":
-            engine.state.observation = next_observation.pin_memory()
-        else:
-            engine.state.observation = next_observation
-
-        if done:  # Iteration events still fired.
-            engine.terminate_epoch()
-
-    explorer = Engine(_process_func)
-
-    @explorer.on(Events.ITERATION_STARTED)
-    def _move_to_device(engine):
-        engine.state.observation = engine.state.observation.to(
-            device=device, non_blocking=True)
-
-    @explorer.on(Events.EPOCH_STARTED)
-    def _init_episode(engine):
-        engine.state.observation = env.reset().to(dtype=dtype)
-
-    @explorer.on(Events.COMPLETED)
-    def _close(engine):
-        env.close()
-
-    return explorer
+        """
+        engine.state.extra_transition_members = members

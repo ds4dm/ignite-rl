@@ -5,7 +5,7 @@ import torch
 
 from ignite.engine import Events
 
-from irl.exploration.explorer import Transition, create_explorer
+from irl.exploration.explorer import Transition, Explorer
 
 
 class Env:
@@ -44,7 +44,7 @@ def test_transition(device):
 def test_explorer_mock():
     select_action = mock.MagicMock()
     select_action.return_value = 1, {}
-    explorer = create_explorer(Env(), select_action)
+    explorer = Explorer(Env(), select_action)
     explorer.run(range(100), 2)
 
     assert select_action.call_count == 22
@@ -53,14 +53,14 @@ def test_explorer_mock():
 
 def test_explorer(env):
     def select_action(engine, iter):
-        return env.action_space.sample(), {}
+        return env.action_space.sample()
 
-    explorer = create_explorer(env, select_action)
+    explorer = Explorer(env, select_action)
     explorer.run(range(10), 2)
 
 
 def test_explorer_cast(device):
-    explorer = create_explorer(
+    explorer = Explorer(
         Env(),
         lambda x, y: (None, {}),
         dtype=torch.int,
