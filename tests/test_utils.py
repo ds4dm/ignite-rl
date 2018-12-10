@@ -1,5 +1,8 @@
 # coding: utf-8
 
+import threading
+
+import pytest
 import mock
 import numpy as np
 import scipy.sparse as sp
@@ -68,3 +71,29 @@ def test_default_merge(device):
     assert data_merged["b"].device == device
     assert isinstance(data_merged[3], tuple)
     assert (data_merged[3][0] == 10 * torch.ones(4).long()).all().item()
+
+
+def test_RWLock():
+    lock = utils.RWLock()
+
+    def dummy_read():
+        with lock.reader():
+            assert True
+
+    def dummy_write():
+        with lock.writer():
+            assert True
+
+    with lock.reader():
+        threading.Thread(target=dummy_read).start()
+
+
+def test_Range():
+    for i in utils.Range(3):
+        assert 0 <= i < 3
+
+    for i in utils.Range(None):
+        if i >= 4:
+            break
+        else:
+            assert 0 <= i < 4

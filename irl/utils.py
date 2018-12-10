@@ -2,6 +2,9 @@
 
 """Utilities."""
 
+import threading
+import contextlib
+import itertools
 import collections.abc
 from functools import wraps
 from numbers import Number
@@ -132,3 +135,109 @@ def default_merge(
         merged = [default_merge([e[i] for e in seq]) for i in range(len(elem))]
         return elem.__class__(merged)
     return seq
+
+
+class Range:
+    """Simple range that supports None for infinity."""
+
+    def __init__(self, end=None):
+        """Initialize object."""
+        self._end = end
+
+    def __iter__(self):
+        """Iterate over a possibly infiite range."""
+        if self._end is None:
+            return itertools.count()
+        else:
+            return iter(range(self._end))
+
+
+class RWLock(object):
+    """Reader-writer lock with preference to writers.
+
+    Readers can access a resource simultaneously.
+    Writers get an exclusive access.
+
+    API is self-descriptive:
+        reader_enters()
+        reader_leaves()
+        writer_enters()
+        writer_leaves()
+    """
+
+    def __init__(self):
+        """Initialize read-write lock."""
+        self.mutex = threading.RLock()
+        self.can_read = threading.Semaphore(0)
+        self.can_write = threading.Semaphore(0)
+        self.active_readers = 0
+        self.active_writers = 0
+        self.waiting_readers = 0
+        self.waiting_writers = 0
+
+    def reader_enters(self):
+        """Acquire reader lock."""
+        with self.mutex:
+            if self.active_writers == 0 and self.waiting_writers == 0:
+                self.active_readers += 1
+                self.can_read.release()
+            else:
+                self.waiting_readers += 1
+        self.can_read.acquire()
+
+    def reader_leaves(self):
+        """Release reader lock."""
+        with self.mutex:
+            self.active_readers -= 1
+            if self.active_readers == 0 and self.waiting_writers != 0:
+                self.active_writers += 1
+                self.waiting_writers -= 1
+                self.can_write.release()
+
+    @contextlib.contextmanager
+    def reader(self):
+        """Reader lock as context manager."""
+        self.reader_enters()
+        try:
+            yield
+        finally:
+            self.reader_leaves()
+
+    def writer_enters(self):
+        """Acquire writer lock."""
+        with self.mutex:
+            if (
+                self.active_writers == 0
+                and self.waiting_writers == 0
+                and self.active_readers == 0
+            ):
+                self.active_writers += 1
+                self.can_write.release()
+            else:
+                self.waiting_writers += 1
+        self.can_write.acquire()
+
+    def writer_leaves(self):
+        """Release writer lock."""
+        with self.mutex:
+            self.active_writers -= 1
+            if self.waiting_writers != 0:
+                self.active_writers += 1
+                self.waiting_writers -= 1
+                self.can_write.release()
+            elif self.waiting_readers != 0:
+                t = self.waiting_readers
+                self.waiting_readers = 0
+                self.active_readers += t
+                while t > 0:
+                    self.can_read.release()
+                    t -= 1
+
+    @contextlib.contextmanager
+    def writer(self):
+        """Writer lock as context manager."""
+        self.writer_enters()
+        try:
+            yield
+        finally:
+            self.writer_leaves()
