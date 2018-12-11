@@ -73,6 +73,7 @@ def test_default_merge(device):
     assert (data_merged[3][0] == 10 * torch.ones(4).long()).all().item()
 
 
+@pytest.mark.timeout(1)
 def test_RWLock():
     lock = utils.RWLock()
 
@@ -80,12 +81,10 @@ def test_RWLock():
         with lock.reader():
             assert True
 
-    def dummy_write():
-        with lock.writer():
-            assert True
-
     with lock.reader():
-        threading.Thread(target=dummy_read).start()
+        t = threading.Thread(target=dummy_read)
+        t.start()
+        t.join()
 
 
 def test_Range():
