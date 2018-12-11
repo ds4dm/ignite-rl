@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from ignite.engine import Engine, Events
+from ignite.engine import Events
 
 from irl.exploration.environment import Environment
 from irl.exploration.explorer import Explorer
@@ -18,21 +18,21 @@ import irl.exploration.transforms as transforms
 
 def create_reinforce(
     env: Environment,
-    model: nn.Module,
+    policy: nn.Module,
     optimizer: optim.Optimizer,
     discount: float = .99,
     exploration: float = .001,
     grad_norm_clip: Optional[float] = 1.,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
-) -> Engine:
+) -> Explorer:
     """Create an agent using Reinforce learning algorithm.
 
     Parameters
     ----------
     env:
         The environment the agent interacts with.
-    model:
+    policy:
         The neural network used to model the policy.
     optimizer:
         The optimizer used to update the `model` parameters.
@@ -53,12 +53,11 @@ def create_reinforce(
         The ignite engine, exploring the environement and optimizing.
 
     """
-    if device is not None:
-        model.to(device, dtype)
+    policy.to(device=device, dtype=dtype)
 
     def select_action(engine: Explorer, observation):
-        model.train()
-        action_distrib = model(observation)
+        policy.train()
+        action_distrib = policy(observation)
         action = action_distrib.sample()
         engine.store_transition_members(
             log_prob=action_distrib.log_prob(action),
@@ -99,7 +98,7 @@ def create_reinforce(
             loss.backward()
 
         if grad_norm_clip is not None:
-            nn.utils.clip_grad_norm_(model.parameters(), grad_norm_clip)
+            nn.utils.clip_grad_norm_(policy.parameters(), grad_norm_clip)
         optimizer.step()
 
     return agent
@@ -107,7 +106,7 @@ def create_reinforce(
 
 def create_a2c(
     env: Environment,
-    model: nn.Module,
+    actor_critic: nn.Module,
     optimizer: optim.Optimizer,
     discount: float = .99,
     exploration: float = .001,
@@ -116,14 +115,14 @@ def create_a2c(
     grad_norm_clip: Optional[float] = 1.,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
-) -> Engine:
+) -> Explorer:
     """Create an agent using Reinforce learning algorithm.
 
     Parameters
     ----------
     env:
         The environment the agent interacts with.
-    model:
+    actor_critic:
         The neural network used to model the policy and critic. Must return a
         tuple (action probalility distribution, critic value).
     optimizer:
@@ -149,12 +148,11 @@ def create_a2c(
         The ignite engine, exploring the environement and optimizing.
 
     """
-    if device is not None:
-        model.to(device, dtype)
+    actor_critic.to(device=device, dtype=dtype)
 
     def select_action(engine, observation):
-        model.train()
-        action_distrib, critic_value = model(observation)
+        actor_critic.train()
+        action_distrib, critic_value = actor_critic(observation)
         action = action_distrib.sample()
         engine.store_transition_members(
             log_prob=action_distrib.log_prob(action),
@@ -198,7 +196,7 @@ def create_a2c(
             loss.backward()
 
         if grad_norm_clip is not None:
-            nn.utils.clip_grad_norm_(model.parameters(), grad_norm_clip)
+            nn.utils.clip_grad_norm_(actor_critic.parameters(), grad_norm_clip)
         optimizer.step()
 
     return agent

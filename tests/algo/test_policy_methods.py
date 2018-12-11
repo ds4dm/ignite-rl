@@ -10,7 +10,7 @@ def test_reinforce(device, env_factory, model):
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
     agent = create_reinforce(
         env=env_factory(),
-        model=model,
+        policy=model,
         optimizer=optimizer,
         device=device,
         dtype=torch.float32
@@ -24,7 +24,7 @@ def test_a2c(device, env_factory, model):
     optimizer = optim.SGD(model.parameters(), lr=1e-3)
     agent = create_a2c(
         env=env_factory(),
-        model=model,
+        actor_critic=model,
         optimizer=optimizer,
         device=device,
         dtype=torch.float32
