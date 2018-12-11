@@ -36,7 +36,7 @@ def test_parallel_Trajectories():
     class DummyWrite(threading.Thread):
         def __init__(self):
             super().__init__()
-            self.ds = ds.shared_trajectories()
+            self.ds = ds.new_shared_trajectories()
 
         def run(self):
             self.ds.append(1)

@@ -111,7 +111,7 @@ class Trajectories(Dataset, Generic[Data]):
         with self.par_traj_lock.writer():
             self.partial_trajectory.clear()
 
-    def shared_trajectories(self) -> "Trajectories":
+    def new_shared_trajectories(self) -> "Trajectories":
         """Return a new `Trajectories` sharing underlying data.
 
         The new `Trajectories` share the same `data` and `data_lock` but has a
