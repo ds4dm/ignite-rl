@@ -51,7 +51,9 @@ def test_explorer_mock():
     assert isinstance(explorer.state.transition, Transition)
 
 
-def test_explorer(env):
+def test_explorer(env_factory):
+    env = env_factory()
+
     def select_action(engine, iter):
         return env.action_space.sample()
 
