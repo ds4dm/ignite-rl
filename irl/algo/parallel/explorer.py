@@ -76,6 +76,7 @@ class ParallelExplorer(Explorer):
         max_epoch_or_inf = float("inf") if max_epochs is None else max_epochs
         self.thread = threading.Thread(
             target=super().run,
-            args=(Range(max_episode_length), max_epoch_or_inf)
+            args=(Range(max_episode_length), max_epoch_or_inf),
+            daemon=True
         )
         self.thread.start()
