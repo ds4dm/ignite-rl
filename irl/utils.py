@@ -10,6 +10,7 @@ from functools import wraps
 from numbers import Number
 from typing import Callable, Sequence, Mapping, Union, Any, Optional
 
+import attr
 import numpy as np
 import scipy.sparse as sp
 import torch
@@ -241,3 +242,44 @@ class RWLock(object):
             yield
         finally:
             self.writer_leaves()
+
+
+@attr.s(auto_attribs=True)
+class Counter:
+    """A simple thread safe counter that can be waited on some value.
+
+    Attributes
+    ----------
+    target:
+        When the counter reaches this value, the event is set.
+    count:
+        The internal counter.
+    lock:
+        Reentrant lock for accessing the internal count.
+    event:
+        Signal that the counter reached its target.
+
+    """
+
+    target: int = 1000
+    count: int = attr.ib(init=False, default=0)
+    lock: threading.RLock = attr.ib(init=False, factory=threading.RLock)
+    event: threading.Event = attr.ib(init=False, factory=threading.Event)
+
+    def __iadd__(self, amount: int) -> "Counter":
+        """Increase the counter."""
+        with self.lock:
+            self.count += amount
+            if self.count >= self.target:
+                self.event.set()
+        return self
+
+    def wait(self, timeout: int) -> None:
+        """Wait unitl the counter reaches the target value."""
+        self.event.wait(timeout)
+
+    def reset(self) -> None:
+        """Reset the object."""
+        with self.lock:
+            self.count = 0
+        self.event.clear()

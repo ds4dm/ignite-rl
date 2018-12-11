@@ -96,3 +96,23 @@ def test_Range():
             break
         else:
             assert 0 <= i < 4
+
+
+@pytest.mark.timeout(1)
+def test_Counter():
+    counter = utils.Counter(10)
+
+    def wait_assert():
+        counter.wait()
+        assert counter.count >= 10
+
+    t = threading.Thread(target=wait_assert)
+    t.start()
+
+    for _ in range(10):
+        counter += 1
+
+    t.join()
+    counter.reset()
+    assert counter.count == 0
+    assert not counter.event.is_set()
