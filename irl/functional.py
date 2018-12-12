@@ -2,6 +2,9 @@
 
 """A collection of auxilliary functions for reinforcement learning."""
 
+from functools import singledispatch
+
+import numpy as np
 import torch
 import torch.nn.functional as F
 
@@ -10,17 +13,39 @@ def value_td_residuals(
     rewards: torch.Tensor,
     values: torch.Tensor,
     next_values: torch.Tensor,
+    dones: torch.Tensor,
     discount: float
 ) -> torch.Tensor:
     """Compute TD residual of state value function.
 
     All tensors must be one dimensional.
+
+    Parameters
+    ----------
+    rewards:
+        The one step reward.
+    values:
+        The estimated values at the current step.
+    next_values:
+        The estimated values at the next step.
+    dones:
+        Whether the state is terminal.
+    discount:
+        The discount rate.
+
     """
-    return rewards + (discount * next_values) - values
+    # If the stte is terminal (done == 1), the return is 0, not the critic
+    # estimate
+    if isinstance(dones, torch.Tensor) and dones.dtype == torch.uint8:
+        next_v = torch.where(dones, torch.zeros_like(next_values), next_values)
+    else:
+        next_v = next_values * (1. - dones)
+    return rewards + (discount * next_v) - values
 
 
+@singledispatch
 def discounted_sum(
-    X: torch.Tensor, discount: float, last: float = 0.
+    X: list, discount: float, last: float = 0.
 ) -> torch.Tensor:
     """Compute a discounted sum for every element.
 
@@ -30,10 +55,26 @@ def discounted_sum(
     """
     outputs = []
     d = last
-    for x in X.cpu().numpy()[::-1]:
+    for x in X[::-1]:
         d = discount * d + x
         outputs.append(d)
-    return torch.tensor(outputs[::-1], dtype=torch.float, device=X.device)
+    return outputs[::-1]
+
+
+@discounted_sum.register
+def _(
+    X: np.ndarray, discount: float, last: float = 0.
+) -> torch.Tensor:
+    output = discounted_sum(X.tolist(), discount=discount, last=last)
+    return np.array(output, dtype=np.float32)
+
+
+@discounted_sum.register
+def _(
+    X: torch.Tensor, discount: float, last: float = 0.
+) -> torch.Tensor:
+    output = discounted_sum(X.cpu().numpy(), discount=discount, last=last)
+    return torch.from_numpy(output).to(dtype=torch.float, device=X.device)
 
 
 def returns(
@@ -41,7 +82,8 @@ def returns(
 ) -> torch.Tensor:
     """Compute the disounted returns given the rewards.
 
-    This is equivalent to `discoutned_sum`.
+    This is equivalent to `discoutned_sum`. This is valid only for one
+    trajectory.
     """
     return discounted_sum(rewards, discount=discount, last=last)
 
@@ -54,17 +96,23 @@ def normalize_1d(x: torch.Tensor) -> torch.Tensor:
 def generalize_advatange_estimation(
     rewards: torch.Tensor,
     values: torch.Tensor,
+    dones: torch.tensor,
     discount: float = .99,
-    lambda_: float = .9,
-    normalize: bool = True
+    lambda_: float = .9
 ) -> torch.Tensor:
     """Compute generalize advatange estimation.
 
     The discounted sum of TD residuals as described in the generalized advatage
     estimation paper: http://arxiv.org/abs/1506.02438
+    This is valid only for one trajectory.
     """
     v_td_residuals = value_td_residuals(
-        rewards, values[:-1], values[1:], discount=discount)
+        rewards=rewards,
+        values=values[:-1],
+        next_values=values[1:],
+        dones=dones,
+        discount=discount
+    )
     return discounted_sum(v_td_residuals, discount*lambda_)
 
 
