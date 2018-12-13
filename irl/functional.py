@@ -89,7 +89,8 @@ def generalize_advatange_estimation(
     rewards: torch.Tensor,
     values: torch.Tensor,
     discount: float = .99,
-    lambda_: float = .9
+    lambda_: float = .9,
+    normalize: bool = True
 ) -> torch.Tensor:
     """Compute generalize advatange estimation.
 
@@ -103,6 +104,8 @@ def generalize_advatange_estimation(
         next_values=values[1:],
         discount=discount
     )
+    if normalize:
+        v_td_residuals = normalize_1d(v_td_residuals)
     return discounted_sum(v_td_residuals, discount*lambda_)
 
 
