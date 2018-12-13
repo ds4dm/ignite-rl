@@ -123,7 +123,7 @@ def ppo_loss(
     Parameters
     ----------
     targets:
-        Often returns or advantages. What the probilities ration is multiplied
+        Often returns or advantages. What the probabilities ratio is multiplied
         by. One dimensional.
     log_probs:
         Current log probabilities of the actions taken (under current policy).
