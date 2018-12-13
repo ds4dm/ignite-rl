@@ -13,34 +13,26 @@ def value_td_residuals(
     rewards: torch.Tensor,
     values: torch.Tensor,
     next_values: torch.Tensor,
-    dones: torch.Tensor,
     discount: float
 ) -> torch.Tensor:
     """Compute TD residual of state value function.
 
-    All tensors must be one dimensional.
+    All tensors must be one dimensional. This is valid only for one trajectory.
 
     Parameters
     ----------
     rewards:
         The one step reward.
     values:
-        The estimated values at the current step.
+        The estimated values at the current step. Note that the last test is
+        terminal, the associated value should be zero.
     next_values:
         The estimated values at the next step.
-    dones:
-        Whether the state is terminal.
     discount:
         The discount rate.
 
     """
-    # If the stte is terminal (done == 1), the return is 0, not the critic
-    # estimate
-    if isinstance(dones, torch.Tensor) and dones.dtype == torch.uint8:
-        next_v = torch.where(dones, torch.zeros_like(next_values), next_values)
-    else:
-        next_v = next_values * (1. - dones)
-    return rewards + (discount * next_v) - values
+    return rewards + (discount * next_values) - values
 
 
 @singledispatch
@@ -96,7 +88,6 @@ def normalize_1d(x: torch.Tensor) -> torch.Tensor:
 def generalize_advatange_estimation(
     rewards: torch.Tensor,
     values: torch.Tensor,
-    dones: torch.tensor,
     discount: float = .99,
     lambda_: float = .9
 ) -> torch.Tensor:
@@ -110,7 +101,6 @@ def generalize_advatange_estimation(
         rewards=rewards,
         values=values[:-1],
         next_values=values[1:],
-        dones=dones,
         discount=discount
     )
     return discounted_sum(v_td_residuals, discount*lambda_)
