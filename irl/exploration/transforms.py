@@ -18,7 +18,7 @@ def compose(*transforms: Callable) -> Callable:
 
 @attr.s(auto_attribs=True)
 class WithReturns:
-    """Transform class to add a the return to every item."""
+    """Transform class for transitions to add a the return to every item."""
 
     discount: float = .9
     normalize: bool = True
@@ -42,5 +42,58 @@ class WithReturns:
                 slots=True
             )
 
-        return [self._Transition(**attr.asdict(x), retrn=r)
-                for x, r in zip(trajectory, returns.tolist())]
+        return [self._Transition(**attr.asdict(t), retrn=r)
+                for t, r in zip(trajectory, returns.tolist())]
+
+
+@attr.s(auto_attribs=True)
+class WithGAE:
+    """Generalized Advantage Estimation.
+
+    Transform class for transitions to add a the generalized advantage
+    estimation to every item.
+    """
+
+    discount: float = .99
+    lambda_: float = .9
+    normalize: bool = True
+    dtype: torch.dtype = torch.float32
+
+    _Transition: type = attr.ib(init=False)
+
+    def __call__(self, trajectory: List[Any]) -> List[Any]:
+        """Add the return to every item in the trajectory."""
+        rewards = [t.reward for t in trajectory]
+        values = [t.critic_value for t in trajectory]
+        if trajectory[-1].done:
+            # Value of terminal state is zero
+            values.append(0.)
+        else:
+            # Missing the critic value for the next observation
+            # We shorten the trajectory by one
+            del rewards[-1]
+
+        with torch.no_grad():
+            rewards = torch.tensor(rewards, dtype=self.dtype)
+            values = torch.tensor(values, dtype=self.dtype)
+
+            gae = Firl.generalize_advatange_estimation(
+                rewards=rewards,
+                values=values,
+                discount=self.discount,
+                lambda_=self.lambda_,
+                normalize=self.normalize
+            )
+
+        if not hasattr(self, "_Transition"):
+            self._Transition = attr.make_class(
+                trajectory[0].__class__.__name__,
+                ["gae"],
+                bases=(trajectory[0].__class__, ),
+                frozen=True,
+                slots=True
+            )
+
+        # trunctation done by zip if reward is smaller than transitions
+        return [self._Transition(**attr.asdict(t), gae=g)
+                for t, g in zip(trajectory, gae.tolist())]
