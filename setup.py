@@ -1,6 +1,11 @@
 # coding: utf-8
 
+import sys
 from setuptools import setup, find_packages
+
+
+needs_pytest = {'pytest', 'test', 'ptr'}.intersection(sys.argv)
+pytest_runner = ['pytest-runner'] if needs_pytest else []
 
 
 setup(
@@ -18,5 +23,14 @@ setup(
         "torch",
         "pytorch-ignite",
         "attrs"
+    ],
+    # Testing
+    # usage: python setup.py pytest --addopts --cov=irl
+    setup_requires=[] + pytest_runner,
+    tests_require=[
+        "pytest",
+        "pytest-cov",
+        "mock",
+        "gym"
     ]
 )
