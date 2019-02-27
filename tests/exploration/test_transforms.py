@@ -1,8 +1,10 @@
 # coding: utf-8
 
 import attr
+import torch
 
 import irl.exploration.transforms as T
+import irl.exploration.data as data
 
 
 def test_compose():
@@ -39,3 +41,16 @@ def test_WithGAE():
     trajectory.append(Transition(9, 3., True))
     transformed = transform(trajectory)
     assert len(transformed) == len(trajectory)
+
+
+def test_PinIfCuda(device):
+    Transition = attr.make_class("Transition", ("x", ), bases=(data.Data, ))
+    trajectory = [Transition(torch.rand(5, device=device)) for _ in range(4)]
+    transform = T.PinIfCuda(device=device)
+
+    transformed = transform(trajectory)
+    assert isinstance(transformed, list)
+    assert len(transformed) == len(trajectory)
+    assert all(isinstance(t.x, torch.Tensor) for t in transformed)
+    if device.type == "cuda":
+        assert all(t.x.is_pinned() for t in transformed)

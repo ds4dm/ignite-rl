@@ -97,3 +97,17 @@ class WithGAE:
         # trunctation done by zip if reward is smaller than transitions
         return [self._Transition(**attr.asdict(t), gae=g)
                 for t, g in zip(trajectory, gae.tolist())]
+
+
+@attr.s(auto_attribs=True)
+class PinIfCuda:
+    """Pin the data if the device is of type Cuda."""
+
+    device: torch.device = attr.ib(converter=torch.device)
+
+    def __call__(self, trajectory: List[Any]) -> List[Any]:
+        """Return the list of pined transitions, if the device is Cuda."""
+        if self.device.type == "cuda":
+            return [t.pin_memory() for t in trajectory]
+        else:
+            return trajectory
