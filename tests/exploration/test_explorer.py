@@ -45,18 +45,20 @@ def test_explorer_mock():
     select_action = mock.MagicMock()
     select_action.return_value = 1, {}
     explorer = Explorer(Env(), select_action)
-    explorer.run(range(100), 2)
+    explorer.run(100, 2)
 
     assert select_action.call_count == 22
     assert isinstance(explorer.state.transition, Transition)
 
 
-def test_explorer(env):
+def test_explorer(env_factory):
+    env = env_factory()
+
     def select_action(engine, iter):
         return env.action_space.sample()
 
     explorer = Explorer(env, select_action)
-    explorer.run(range(10), 2)
+    explorer.run(10, 2)
 
 
 def test_explorer_cast(device):
@@ -65,7 +67,7 @@ def test_explorer_cast(device):
         lambda x, y: (None, {}),
         dtype=torch.int,
         device=device)
-    explorer.run(range(10))
+    explorer.run(10, 1)
 
     # Observation are casted lazily
     @explorer.on(Events.ITERATION_STARTED)

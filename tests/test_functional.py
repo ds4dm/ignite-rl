@@ -30,7 +30,9 @@ def test_normalize_1d(device):
 
 def test_generalize_advatange_estimation(device):
     Firl.generalize_advatange_estimation(
-        torch.rand(10, device=device), torch.rand(11, device=device))
+        torch.rand(10, device=device),
+        torch.rand(11, device=device)
+    )
 
 
 def test_ppo_loss(device):

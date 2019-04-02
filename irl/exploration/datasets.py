@@ -11,6 +11,7 @@ import attr
 from torch.utils.data import Dataset
 
 from irl.exploration.explorer import Transition
+import irl.utils as utils
 
 
 Data = TypeVar("Data")
@@ -27,6 +28,8 @@ class Trajectories(Dataset, Generic[Data]):
     information, or compute values depending on the whole trajectory, such
     as the returns.
 
+    The class is thread safe for simple operations.
+
     Attributes
     ----------
     trajectory_transform:
@@ -35,6 +38,12 @@ class Trajectories(Dataset, Generic[Data]):
         A list of all transformed transitions.
     partial_trajectory:
         A buffer to put transitions, waiting for the episode to terminate.
+    data_lock:
+        A lock that let multiple readers xor one writter acess the data at the
+        time.
+    par_traj_lock:
+        A lock that let multiple readers xor one writter acess the partial
+        trajectory at the time.
 
     """
 
@@ -42,31 +51,37 @@ class Trajectories(Dataset, Generic[Data]):
 
     data: List[Data] = attr.ib(init=False, factory=list)
     partial_trajectory: List[Transition] = attr.ib(init=False, factory=list)
+    data_lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
+    par_traj_lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.data[idx]
-        if isinstance(selected, list):
-            return Trajectories(self.trajectory_transform, selected)
-        else:
-            return selected
+        with self.data_lock.reader():
+            selected = self.data[idx]
+            if isinstance(selected, list):
+                return Trajectories(self.trajectory_transform, selected)
+            else:
+                return selected
 
     def __len__(self) -> int:
         """Length of the trajectory."""
-        return len(self.data)
+        with self.data_lock.reader():
+            return len(self.data)
 
     def __iter__(self) -> Iterator[Data]:
         """Iterate over the data.
 
         Method defined for when using a Dataloder is overkill.
         """
-        return iter(self.data)
+        with self.data_lock.reader():
+            return iter(self.data)
 
     def concat(self, trajectory: List[Transition]) -> None:
         """Add a new trajectory to the dataset."""
-        self.data[len(self.data):] = self.trajectory_transform(trajectory)
+        with self.data_lock.writer():
+            self.data += self.trajectory_transform(trajectory)
 
     def append(self, transition: Transition) -> None:
         """Append a single transition.
@@ -74,7 +89,8 @@ class Trajectories(Dataset, Generic[Data]):
         Stage the transition in the buffer `partial_trajectory`. Use
         `terminate_trajectory` to signal start a new trajectory.
         """
-        self.partial_trajectory.append(transition)
+        with self.par_traj_lock.writer():
+            self.partial_trajectory.append(transition)
 
     def terminate_trajectory(self) -> None:
         """Terminate a partial trajectory.
@@ -85,12 +101,28 @@ class Trajectories(Dataset, Generic[Data]):
         truncate the episode before a terminal state.
         """
         self.concat(self.partial_trajectory)
-        self.partial_trajectory.clear()
+        with self.par_traj_lock.writer():
+            self.partial_trajectory.clear()
 
     def clear(self) -> None:
         """Empty the dataset."""
-        self.data.clear()
-        self.partial_trajectory.clear()
+        with self.data_lock.writer():
+            self.data.clear()
+        with self.par_traj_lock.writer():
+            self.partial_trajectory.clear()
+
+    def new_shared_trajectories(self) -> "Trajectories":
+        """Return a new `Trajectories` sharing underlying data.
+
+        The new `Trajectories` share the same `data` and `data_lock` but has a
+        separate mechanism for partial trajectory. This is useful for parallel
+        actors populating a same dataset.
+        """
+        shared = Trajectories(trajectory_transform=self.trajectory_transform)
+        with self.data_lock.reader():
+            shared.data = self.data
+            shared.data_lock = self.data_lock
+        return shared
 
 
 @attr.s(auto_attribs=True)
@@ -101,6 +133,8 @@ class MemoryReplay(Dataset, Generic[Data]):
     limit the capacity of the replay buffer to a certain amount. Oldest
     elements are removed.
 
+    The class is thread safe for simple operations.
+
     Attributes
     ----------
     transform:
@@ -109,6 +143,9 @@ class MemoryReplay(Dataset, Generic[Data]):
         Optional capacity limit.
     data:
         A list of all transformed transitions.
+    lock:
+        A lock that let multiple readers xor one writter acess the data at the
+        time.
 
     """
 
@@ -116,34 +153,41 @@ class MemoryReplay(Dataset, Generic[Data]):
     capacity: Optional[int] = None
 
     data: List[Data] = attr.ib(init=False, factory=list)
+    lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
 
     def __getitem__(
         self, idx: Union[int, slice]
     ) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
-        selected = self.data[idx]
-        if isinstance(selected, list):
-            return MemoryReplay(self.transform, selected)
-        else:
-            return selected
+        with self.lock.reader():
+            selected = self.data[idx]
+            if isinstance(selected, list):
+                return MemoryReplay(self.transform, selected)
+            else:
+                return selected
 
     def __len__(self) -> int:
         """Length of the trajectory."""
-        return len(self.data)
+        with self.lock.reader():
+            return len(self.data)
 
     def __iter__(self) -> Iterator[Data]:
         """Iterate over the data.
 
         Method defined for when using a Dataloder is overkill.
         """
-        return iter(self.data)
+        with self.lock.reader():
+            return iter(self.data)
 
     def append(self, transition: Transition) -> None:
         """Add a transition to the dataset."""
-        self.data.append(self.transform(transition))
-        if self.capacity is not None and len(self) > self.capacity:
-            self.data.pop(0)
+        with self.lock.writer():
+            self.data.append(self.transform(transition))
+            # not using len(self) because the lock is not reentrant.
+            if self.capacity is not None and len(self.data) > self.capacity:
+                self.data.pop(0)
 
     def clear(self) -> None:
         """Empty the dataset."""
-        self.data.clear()
+        with self.lock.writer():
+            self.data.clear()

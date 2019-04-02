@@ -1,5 +1,7 @@
 # coding: utf-8
 
+import threading
+
 import attr
 
 import irl.exploration.datasets as D
@@ -28,6 +30,33 @@ def test_Trajectories():
     assert len(ds) == len(ds.partial_trajectory) == 0
 
 
+def test_parallel_Trajectories():
+    ds = D.Trajectories()
+
+    class DummyWrite(threading.Thread):
+        def __init__(self):
+            super().__init__()
+            self.ds = ds.new_shared_trajectories()
+
+        def run(self):
+            self.ds.append(1)
+
+    threads = [DummyWrite() for _ in range(3)]
+    with ds.data_lock.writer():
+        for t in threads:
+            t.start()
+
+    for t in threads:
+        t.join()
+    assert len(ds) == 0
+    assert len(ds.partial_trajectory) == 0
+
+    for t in threads:
+        t.ds.terminate_trajectory()
+    assert len(ds) == 3
+    assert len(ds.partial_trajectory) == 0
+
+
 def test_MemoryReplay():
     ds = D.MemoryReplay(lambda x: x-1, capacity=3)
 
@@ -42,3 +71,23 @@ def test_MemoryReplay():
 
     ds.clear()
     assert len(ds) == 0
+
+
+def test_parallel_MemoryReplay():
+    ds = D.MemoryReplay()
+
+    def dummy_write():
+        ds.append(1)
+
+    threads = []
+    with ds.lock.writer():
+        for _ in range(3):
+            t = threading.Thread(target=dummy_write)
+            t.start()
+            threads.append(t)
+        assert len(ds.data) == 0
+
+    for t in threads:
+        t.join()
+
+    assert len(ds) == 3

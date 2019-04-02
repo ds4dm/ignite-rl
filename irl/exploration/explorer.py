@@ -15,12 +15,14 @@ free to define their own types. For these particluar cases, a function can be
 passed to `Trajectory` method to merge observations or actions.
 """
 
-from typing import Callable, Optional, Generic, Dict, Tuple
+from typing import Callable, Optional, Generic
+import numbers
 
 import attr
 import torch
-from ignite.engine import Engine, Events
+from ignite.engine import Engine, Events, State
 
+import irl.utils as utils
 from .environment import Observation, Action, Environment
 from .data import Data
 
@@ -60,7 +62,7 @@ class Explorer(Engine):
     def __init__(
         self,
         env: Environment,
-        select_action: Callable[[Engine, int], Tuple[Action, Dict]],
+        select_action: Callable[[Engine, Observation], Action],
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
     ) -> Engine:
@@ -84,12 +86,24 @@ class Explorer(Engine):
             `select_action` function.
 
         """
+        def _maybe_pin(state):
+            """Pin observation if necessary.
+
+            Set the attribute `observation_dev` with a pinned version
+            of observation if necessary.
+            """
+            if device is not None and torch.device(device).type == "cuda":
+                state.observation_dev = state.observation.pin_memory()
+            else:
+                state.observation_dev = state.observation
+
         def _process_func(engine, timestep):
+            """Take action on each iteeration."""
             # Store timestep for user
             engine.state.episode_timestep = timestep
 
             # Select action.
-            action = select_action(engine, engine.state.observation)
+            action = select_action(engine, engine.state.observation_dev)
 
             # Make action.
             next_observation, reward, done, infos = env.step(action)
@@ -112,10 +126,9 @@ class Explorer(Engine):
             engine.state.environment_info = infos
 
             # Save for next move
-            if device is not None and torch.device(device).type == "cuda":
-                engine.state.observation = next_observation.pin_memory()
-            else:
-                engine.state.observation = next_observation
+            # Observation on cpu (untouched)
+            engine.state.observation = next_observation
+            _maybe_pin(engine.state)
 
             if done:  # Iteration events still fired.
                 engine.terminate_epoch()
@@ -128,16 +141,13 @@ class Explorer(Engine):
 
         @self.on(Events.ITERATION_STARTED)
         def _move_to_device(engine):
-            engine.state.observation = engine.state.observation.to(
+            engine.state.observation_dev = engine.state.observation_dev.to(
                 device=device, non_blocking=True)
 
         @self.on(Events.EPOCH_STARTED)
         def _init_episode(engine):
             engine.state.observation = env.reset().to(dtype=dtype)
-
-        @self.on(Events.COMPLETED)
-        def _close(engine):
-            env.close()
+            _maybe_pin(engine.state)
 
     def register_transition_members(
         engine,
@@ -182,3 +192,29 @@ class Explorer(Engine):
 
         """
         engine.state.extra_transition_members = members
+
+    def run(
+        self,
+        max_episode_length: Optional[int] = None,
+        max_episodes: Optional[int] = None
+    ) -> State:
+        """Run the explorer.
+
+        Parameters
+        ----------
+        max_episode_length:
+            Episode are truncated after this number of timesteps. Use `None`
+            to not use truncation.
+        max_episodes:
+            Number of episode to run for.
+
+        Return
+        ------
+        state:
+            The state of the engine.
+
+        """
+        return super().run(
+            utils.Range(max_episode_length),
+            max_epochs=(float("inf") if max_episodes is None else max_episodes)
+        )

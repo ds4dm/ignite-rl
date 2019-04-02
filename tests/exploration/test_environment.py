@@ -5,7 +5,8 @@ import torch
 from irl.utils import from_numpy_sparse
 
 
-def test_gym(env):
+def test_gym(env_factory):
+    env = env_factory()
     assert hasattr(env, "action_space")
     assert isinstance(env.reset(), torch.Tensor)
     action = from_numpy_sparse(env.action_space.sample())
