@@ -2,13 +2,14 @@
 
 import torch
 import torch.optim as optim
+import mock
 
-from irl.algo.policy_methods import create_reinforce, create_a2c
+import irl.algo.policy_methods
 
 
 def test_reinforce(device, env_factory, model):
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    agent = create_reinforce(
+    optimizer = mock.MagicMock()
+    agent = irl.algo.policy_methods.create_reinforce(
         env=env_factory(),
         policy=model,
         optimizer=optimizer,
@@ -17,12 +18,14 @@ def test_reinforce(device, env_factory, model):
     )
 
     agent.run(range(100), 2)
+    optimizer.step.assert_called()
+    optimizer.zero_grad.assert_called()
 
 
 def test_a2c(device, env_factory, model):
     model = model.new_with_critic()
-    optimizer = optim.SGD(model.parameters(), lr=1e-3)
-    agent = create_a2c(
+    optimizer = mock.MagicMock()
+    agent = irl.algo.policy_methods.create_a2c(
         env=env_factory(),
         actor_critic=model,
         optimizer=optimizer,
@@ -31,3 +34,23 @@ def test_a2c(device, env_factory, model):
     )
 
     agent.run(range(10), 2)
+    optimizer.step.assert_called()
+    optimizer.zero_grad.assert_called()
+
+
+def test_ppo(device, env_factory, model):
+    model = model.new_with_critic()
+    optimizer = mock.MagicMock()
+    agent = irl.algo.policy_methods.create_ppo(
+        env=env_factory(),
+        actor_critic=model,
+        optimizer=optimizer,
+        dataset_size=0,
+        batch_size=2,
+        device=device,
+        dtype=torch.float32
+    )
+
+    agent.run(range(10), 2)
+    optimizer.step.assert_called()
+    optimizer.zero_grad.assert_called()
