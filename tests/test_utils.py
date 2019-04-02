@@ -87,15 +87,14 @@ def test_RWLock():
         t.join()
 
 
-def test_Range():
-    for i in utils.Range(3):
-        assert 0 <= i < 3
-
-    for i in utils.Range(None):
-        if i >= 4:
-            break
-        else:
-            assert 0 <= i < 4
+@pytest.mark.parametrize("end", [3, None, float("inf")])
+@pytest.mark.timeout(1)
+def test_Range(end):
+    r = utils.Range(end)
+    for _ in range(2):  # Repeat to ensure r is not resuming
+        equals = [a == b for a, b in zip(r, range(3))]
+        assert len(equals) == 3
+        assert all(equals)
 
 
 @pytest.mark.timeout(1)

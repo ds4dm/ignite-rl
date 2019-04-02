@@ -8,6 +8,7 @@ import itertools
 import collections.abc
 from functools import wraps
 from numbers import Number
+import math
 from typing import Callable, Sequence, Mapping, Union, Any, Optional
 
 import attr
@@ -147,7 +148,7 @@ class Range:
 
     def __iter__(self):
         """Iterate over a possibly infiite range."""
-        if self._end is None:
+        if (self._end is None) or (math.isinf(self._end) and self._end > 0):
             return itertools.count()
         else:
             return iter(range(self._end))
