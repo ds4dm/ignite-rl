@@ -16,11 +16,13 @@ passed to `Trajectory` method to merge observations or actions.
 """
 
 from typing import Callable, Optional, Generic
+import numbers
 
 import attr
 import torch
-from ignite.engine import Engine, Events
+from ignite.engine import Engine, Events, State
 
+import irl.utils as utils
 from .environment import Observation, Action, Environment
 from .data import Data
 
@@ -147,10 +149,6 @@ class Explorer(Engine):
             engine.state.observation = env.reset().to(dtype=dtype)
             _maybe_pin(engine.state)
 
-        @self.on(Events.COMPLETED)
-        def _close(engine):
-            env.close()
-
     def register_transition_members(
         engine,
         *names: str,
@@ -194,3 +192,29 @@ class Explorer(Engine):
 
         """
         engine.state.extra_transition_members = members
+
+    def run(
+        self,
+        max_episode_length: Optional[int] = None,
+        max_episodes: Optional[int] = None
+    ) -> State:
+        """Run the explorer.
+
+        Parameters
+        ----------
+        max_episode_length:
+            Episode are truncated after this number of timesteps. Use `None`
+            to not use truncation.
+        max_episodes:
+            Number of episode to run for.
+
+        Return
+        ------
+        state:
+            The state of the engine.
+
+        """
+        return super().run(
+            utils.Range(max_episode_length),
+            max_epochs=(float("inf") if max_episodes is None else max_episodes)
+        )

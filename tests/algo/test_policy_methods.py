@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import torch
-import torch.optim as optim
 import mock
 
 import irl.algo.policy_methods
@@ -17,7 +16,7 @@ def test_reinforce(device, env_factory, model):
         dtype=torch.float32
     )
 
-    agent.run(range(100), 2)
+    agent.run(100, 2)
     optimizer.step.assert_called()
     optimizer.zero_grad.assert_called()
 
@@ -33,7 +32,7 @@ def test_a2c(device, env_factory, model):
         dtype=torch.float32
     )
 
-    agent.run(range(10), 2)
+    agent.run(10, 2)
     optimizer.step.assert_called()
     optimizer.zero_grad.assert_called()
 
@@ -51,6 +50,6 @@ def test_ppo(device, env_factory, model):
         dtype=torch.float32
     )
 
-    agent.run(range(10), 2)
+    agent.run(10, 2)
     optimizer.step.assert_called()
     optimizer.zero_grad.assert_called()
