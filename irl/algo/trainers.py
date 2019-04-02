@@ -43,10 +43,6 @@ def create_ppo_trainer(
         Clip parameter for the PPO loss.
     exploration_loss_coef:
         Multiplier of the entropy bonus for the encouraging exploration.
-    critic_loss_coef:
-        Mutiplier for the critic loss.
-    critic_loss_function:
-        Loss function used by the critic.
     dtype:
         Type the observations/model are converted to.
     device:

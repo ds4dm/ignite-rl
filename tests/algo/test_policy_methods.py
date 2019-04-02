@@ -44,7 +44,7 @@ def test_ppo(device, env_factory, model):
         env=env_factory(),
         actor_critic=model,
         optimizer=optimizer,
-        dataset_size=0,
+        dataset_size=10,
         batch_size=2,
         device=device,
         dtype=torch.float32

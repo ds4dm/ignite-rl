@@ -224,13 +224,55 @@ def create_ppo(
     critic_loss_function: Callable = F.mse_loss,
     # FIX normalization
     normalize_advantages: bool = False,
-    n_epochs: int = 10,
     dataset_size: int = 1024,
+    n_epochs: int = 10,
     # FIXME change the way the dataloader is passed on to the function
     batch_size: int = 16,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None
 ) -> Explorer:
+    """Create an agent using Proximal Policy Optimization learning algorithm.
+
+    Parameters
+    ----------
+    env:
+        The environment the agent interacts with.
+    actor_critic:
+        The neural network used to model the policy and critic. Must return a
+        tuple (action probalility distribution, critic value).
+    optimizer:
+        The optimizer used to update the `model` parameters.
+    discount:
+        The discount rate used for computing the returns.
+    lambda_:
+        Lambda discount as defined in Generalized Advantage Estimation.
+    ppo_clip:
+        Clip parameter for the PPO loss.
+    exploration_loss_coef:
+        The entropy bonus for encouraging exploration.
+    critic_loss_coef:
+        Mutiplier for the critic loss.
+    critic_loss_function:
+        Loss function used by the critic.
+    normalize_advantages:
+        Whether to normalize the advantages with zero mean and unit variance.
+        Computed over an episode. Raise an error for episode of length 1.
+    dataset_size:
+        Size of the PPO dataset to collect information from agents.
+    n_epoch:
+        Number of epoch of optimization to be on a single PPO dataset.
+    batch_size:
+        Batch size used to optimized over the PPO dataset.
+    dtype:
+        Type the obseravtions/model are casted to.
+    device:
+        Device the observations/model are moved to.
+
+    Returns
+    -------
+        The ignite engine, exploring the environement and optimizing.
+
+    """
     actor_critic.to(device=device, dtype=dtype)
 
     def select_action(engine, observation):
@@ -264,25 +306,27 @@ def create_ppo(
     )
 
     @agent.on(Events.STARTED)
-    def add_trajectories_to_engine(engine):
+    def add_trajectories_and_trainer_to_engine(engine):
         engine.state.trajectories = Trajectories(T.compose(
             T.WithGAE(discount=discount, lambda_=lambda_,
                       normalize=normalize_advantages),
             T.WithReturns(discount=discount, normalize=False),
             T.PinIfCuda(device=device)
         ))
+        engine.state.trainer = trainer
 
     @agent.on(Events.ITERATION_COMPLETED)
     def append_transition(engine):
         engine.state.trajectories.append(engine.state.transition.cpu())
 
     @agent.on(Events.EPOCH_COMPLETED)
-    def terminate_trajectory(engine):
+    def terminate_trajectory_and_data_collection(engine):
         engine.state.trajectories.terminate_trajectory()
 
     @agent.on(Events.EPOCH_COMPLETED)
     def optimize(engine):
         if len(engine.state.trajectories) > dataset_size:
+            engine.terminate()
             sample_elem = engine.state.trajectories[0]
             dataloader = DataLoader(
                 dataset=engine.state.trajectories,
