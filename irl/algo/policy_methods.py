@@ -325,7 +325,7 @@ def create_ppo(
 
     @agent.on(Events.EPOCH_COMPLETED)
     def optimize(engine):
-        if len(engine.state.trajectories) > dataset_size:
+        if len(engine.state.trajectories) >= dataset_size:
             engine.terminate()
             sample_elem = engine.state.trajectories[0]
             dataloader = DataLoader(
