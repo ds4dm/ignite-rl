@@ -7,6 +7,11 @@ import irl.exploration.transforms as T
 import irl.exploration.data as data
 
 
+@attr.s(auto_attribs=True)
+class Obs:
+    x: torch.Tensor = torch.rand(3)
+
+
 def test_compose():
     f = T.compose(
         lambda x: x+2,
@@ -16,29 +21,34 @@ def test_compose():
 
 
 def test_WithReturns():
-    Transition = attr.make_class("Transition", ("reward", ))
-    trajectory = [Transition(i) for i in range(4)]
+    Transition = attr.make_class("Transition", ("reward", "obs"))
+    trajectory = [Transition(i, Obs()) for i in range(4)]
     transform = T.WithReturns(discount=.1, normalize=True)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
     assert len(transformed) == len(trajectory)
-    assert hasattr(transformed[0], "retrn")
+    assert all(hasattr(t, "retrn") for t in transformed)
     assert all(isinstance(t.retrn, float) for t in transformed)
+    assert all(hasattr(t, "obs") for t in transformed)
+    assert all(isinstance(t.obs, Obs) for t in transformed)
 
 
 def test_WithGAE():
-    Transition = attr.make_class("T", ("reward", "critic_value", "done"))
-    trajectory = [Transition(i, 3., False) for i in range(4)]
+    Transition = attr.make_class(
+        "T", ("reward", "critic_value", "done", "obs"))
+    trajectory = [Transition(i, 3., False, Obs()) for i in range(4)]
     transform = T.WithGAE(discount=.1, normalize=True, lambda_=.9)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
     assert len(transformed) == len(trajectory) - 1
-    assert hasattr(transformed[0], "gae")
+    assert all(hasattr(t, "gae") for t in transformed)
     assert all(isinstance(t.gae, float) for t in transformed)
+    assert all(hasattr(t, "obs") for t in transformed)
+    assert all(isinstance(t.obs, Obs) for t in transformed)
 
-    trajectory.append(Transition(9, 3., True))
+    trajectory.append(Transition(9, 3., True, Obs()))
     transformed = transform(trajectory)
     assert len(transformed) == len(trajectory)
 

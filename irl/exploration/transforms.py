@@ -42,7 +42,7 @@ class WithReturns:
                 slots=True
             )
 
-        return [self._Transition(**attr.asdict(t), retrn=r)
+        return [self._Transition(**attr.asdict(t, recurse=False), retrn=r)
                 for t, r in zip(trajectory, returns.tolist())]
 
 
@@ -95,7 +95,7 @@ class WithGAE:
             )
 
         # trunctation done by zip if reward is smaller than transitions
-        return [self._Transition(**attr.asdict(t), gae=g)
+        return [self._Transition(**attr.asdict(t, recurse=False), gae=g)
                 for t, g in zip(trajectory, gae.tolist())]
 
 
