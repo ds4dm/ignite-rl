@@ -25,14 +25,16 @@ class Data:
         self,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
-        non_blocking: bool = False
+        non_blocking: bool = False,
     ) -> "Data":
         """Change type/device of data."""
-        return self.apply(lambda x: x.to(
-            dtype=dtype, device=device, non_blocking=non_blocking))
+        return self.apply(
+            lambda x: x.to(dtype=dtype, device=device, non_blocking=non_blocking)
+        )
 
     def pin_memory(self) -> "Data":
         """Move the underlying tensors to pinned memory."""
+
         def mapper(t):
             # Cannot pin memory of sparse tensor
             if isinstance(t, torch.Tensor) and t.is_sparse:
@@ -62,9 +64,7 @@ class Data:
             return cls.__batched_Class
         except AttributeError:
             cls.__batched_Class = attr.make_class(
-                name="Batch_"+cls.__name__,
-                attrs=[],
-                bases=(cls,)
+                name="Batch_" + cls.__name__, attrs=[], bases=(cls,)
             )
             return cls.__batched_Class
 

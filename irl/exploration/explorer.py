@@ -28,9 +28,7 @@ from .data import Data
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
-class Transition(
-    Data, Generic[Observation, Action]
-):
+class Transition(Data, Generic[Observation, Action]):
     """An observed Transition in the environment."""
 
     observation: Observation
@@ -86,6 +84,7 @@ class Explorer(Engine):
             `select_action` function.
 
         """
+
         def _maybe_pin(state):
             """Pin observation if necessary.
 
@@ -142,18 +141,15 @@ class Explorer(Engine):
         @self.on(Events.ITERATION_STARTED)
         def _move_to_device(engine):
             engine.state.observation_dev = engine.state.observation_dev.to(
-                device=device, non_blocking=True)
+                device=device, non_blocking=True
+            )
 
         @self.on(Events.EPOCH_STARTED)
         def _init_episode(engine):
             engine.state.observation = env.reset().to(dtype=dtype)
             _maybe_pin(engine.state)
 
-    def register_transition_members(
-        engine,
-        *names: str,
-        **name_attribs
-    ) -> None:
+    def register_transition_members(engine, *names: str, **name_attribs) -> None:
         """Register extra members to be stored in the transition object.
 
         At every step, the method `store_transition_members` must be called
@@ -168,12 +164,13 @@ class Explorer(Engine):
             behaviour such as converters).
 
         """
+
         @engine.on(Events.STARTED)
         def _(engine):
             engine.state.TransitionClass = attr.make_class(
                 "Transition",
                 {**{n: attr.ib() for n in names}, **name_attribs},
-                bases=(engine.state.TransitionClass, ),
+                bases=(engine.state.TransitionClass,),
                 frozen=True,
                 slots=True,
             )
@@ -196,7 +193,7 @@ class Explorer(Engine):
     def run(
         self,
         max_episode_length: Optional[int] = None,
-        max_episodes: Optional[int] = None
+        max_episodes: Optional[int] = None,
     ) -> State:
         """Run the explorer.
 
@@ -216,5 +213,5 @@ class Explorer(Engine):
         """
         return super().run(
             utils.Range(max_episode_length),
-            max_epochs=(float("inf") if max_episodes is None else max_episodes)
+            max_epochs=(float("inf") if max_episodes is None else max_episodes),
         )

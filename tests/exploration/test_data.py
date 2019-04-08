@@ -52,10 +52,10 @@ def test_collate():
     assert isinstance(batch.a, torch.Tensor)
     assert batch.a.shape == (2, 10)
     assert isinstance(batch.b, torch.Tensor)
-    assert batch.b.shape == (2, )
+    assert batch.b.shape == (2,)
     assert isinstance(batch.c, Something.get_batch_class())
     assert isinstance(batch.c.x, torch.Tensor)
-    assert batch.c.x.shape == (2, )
+    assert batch.c.x.shape == (2,)
     assert batch.c.x.dtype == torch.int64  # unconcistent in pytorch
     assert isinstance(batch.c.y, torch.Tensor)
     assert batch.c.y.shape == (2, 3)

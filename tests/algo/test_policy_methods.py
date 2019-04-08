@@ -13,7 +13,7 @@ def test_reinforce(device, env_factory, model):
         policy=model,
         optimizer=optimizer,
         device=device,
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     agent.run(100, 2)
@@ -29,7 +29,7 @@ def test_a2c(device, env_factory, model):
         actor_critic=model,
         optimizer=optimizer,
         device=device,
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     agent.run(10, 2)
@@ -47,7 +47,7 @@ def test_ppo(device, env_factory, model):
         dataset_size=4,
         batch_size=2,
         device=device,
-        dtype=torch.float32
+        dtype=torch.float32,
     )
 
     agent.run(10, 2)

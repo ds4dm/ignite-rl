@@ -22,10 +22,10 @@ def create_reinforce(
     env: Environment,
     policy: nn.Module,
     optimizer: optim.Optimizer,
-    discount: float = .99,
-    exploration: float = .001,
+    discount: float = 0.99,
+    exploration: float = 0.001,
     normalize_returns: bool = False,
-    grad_norm_clip: Optional[float] = 1.,
+    grad_norm_clip: Optional[float] = 1.0,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> Explorer:
@@ -66,24 +66,19 @@ def create_reinforce(
         action_distrib = policy(observation)
         action = action_distrib.sample()
         engine.store_transition_members(
-            log_prob=action_distrib.log_prob(action),
-            entropy=action_distrib.entropy()
+            log_prob=action_distrib.log_prob(action), entropy=action_distrib.entropy()
         )
         return action
 
-    agent = Explorer(
-        env=env,
-        select_action=select_action,
-        dtype=dtype,
-        device=device
-    )
+    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
 
     agent.register_transition_members("log_prob", "entropy")
 
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
         engine.state.trajectories = Trajectories(
-            T.WithReturns(discount=discount, normalize=normalize_returns))
+            T.WithReturns(discount=discount, normalize=normalize_returns)
+        )
 
     @agent.on(Events.EPOCH_STARTED)
     def empty_trajectectories(engine):
@@ -114,12 +109,12 @@ def create_a2c(
     env: Environment,
     actor_critic: nn.Module,
     optimizer: optim.Optimizer,
-    discount: float = .99,
-    exploration: float = .001,
+    discount: float = 0.99,
+    exploration: float = 0.001,
     normalize_returns: bool = False,
     critic_loss: Callable = F.mse_loss,
-    critic_multiplier: float = 1.,
-    grad_norm_clip: Optional[float] = 1.,
+    critic_multiplier: float = 1.0,
+    grad_norm_clip: Optional[float] = 1.0,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
 ) -> Explorer:
@@ -167,23 +162,19 @@ def create_a2c(
         engine.store_transition_members(
             log_prob=action_distrib.log_prob(action),
             entropy=action_distrib.entropy(),
-            critic_value=critic_value
+            critic_value=critic_value,
         )
         return action
 
-    agent = Explorer(
-        env=env,
-        select_action=select_action,
-        dtype=dtype,
-        device=device
-    )
+    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
 
     agent.register_transition_members("log_prob", "entropy", "critic_value")
 
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
         engine.state.trajectories = Trajectories(
-            T.WithReturns(discount=discount, normalize=normalize_returns))
+            T.WithReturns(discount=discount, normalize=normalize_returns)
+        )
 
     @agent.on(Events.EPOCH_STARTED)
     def empty_trajectectories(engine):
@@ -216,11 +207,11 @@ def create_ppo(
     env: Environment,
     actor_critic: nn.Module,
     optimizer: optim.Optimizer,
-    discount: float = .99,
-    lambda_: float = .9,
-    ppo_clip: float = .02,
-    exploration_loss_coef: float = .001,
-    critic_loss_coef: float = 1.,
+    discount: float = 0.99,
+    lambda_: float = 0.9,
+    ppo_clip: float = 0.02,
+    exploration_loss_coef: float = 0.001,
+    critic_loss_coef: float = 1.0,
     critic_loss_function: Callable = F.mse_loss,
     # FIX normalization
     normalize_advantages: bool = False,
@@ -229,7 +220,7 @@ def create_ppo(
     # FIXME change the way the dataloader is passed on to the function
     batch_size: int = 16,
     dtype: Optional[torch.dtype] = None,
-    device: Optional[torch.device] = None
+    device: Optional[torch.device] = None,
 ) -> Explorer:
     """Create an agent using Proximal Policy Optimization learning algorithm.
 
@@ -283,16 +274,11 @@ def create_ppo(
             engine.store_transition_members(
                 log_prob=action_distrib.log_prob(action),
                 entropy=action_distrib.entropy(),
-                critic_value=critic_value
+                critic_value=critic_value,
             )
             return action
 
-    agent = Explorer(
-        env=env,
-        select_action=select_action,
-        dtype=dtype,
-        device=device
-    )
+    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
     agent.register_transition_members("log_prob", "entropy", "critic_value")
     trainer = trainers.create_ppo_trainer(
         actor_critic=actor_critic,
@@ -302,17 +288,20 @@ def create_ppo(
         critic_loss_coef=critic_loss_coef,
         critic_loss_function=critic_loss_function,
         device=device,
-        dtype=dtype
+        dtype=dtype,
     )
 
     @agent.on(Events.STARTED)
     def add_trajectories_and_trainer_to_engine(engine):
-        engine.state.trajectories = Trajectories(T.compose(
-            T.WithGAE(discount=discount, lambda_=lambda_,
-                      normalize=normalize_advantages),
-            T.WithReturns(discount=discount, normalize=False),
-            T.PinIfCuda(device=device)
-        ))
+        engine.state.trajectories = Trajectories(
+            T.compose(
+                T.WithGAE(
+                    discount=discount, lambda_=lambda_, normalize=normalize_advantages
+                ),
+                T.WithReturns(discount=discount, normalize=False),
+                T.PinIfCuda(device=device),
+            )
+        )
         engine.state.trainer = trainer
 
     @agent.on(Events.ITERATION_COMPLETED)
@@ -332,7 +321,7 @@ def create_ppo(
                 dataset=engine.state.trajectories,
                 batch_size=batch_size,
                 collate_fn=sample_elem.__class__.collate,
-                drop_last=True
+                drop_last=True,
             )
             trainer.run(dataloader, n_epochs)
             engine.state.trajectories.clear()

@@ -54,9 +54,7 @@ class Trajectories(Dataset, Generic[Data]):
     data_lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
     par_traj_lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
 
-    def __getitem__(
-        self, idx: Union[int, slice]
-    ) -> Union[Data, "Trajectories"]:
+    def __getitem__(self, idx: Union[int, slice]) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
         with self.data_lock.reader():
             selected = self.data[idx]
@@ -155,9 +153,7 @@ class MemoryReplay(Dataset, Generic[Data]):
     data: List[Data] = attr.ib(init=False, factory=list)
     lock: utils.RWLock = attr.ib(init=False, factory=utils.RWLock)
 
-    def __getitem__(
-        self, idx: Union[int, slice]
-    ) -> Union[Data, "Trajectories"]:
+    def __getitem__(self, idx: Union[int, slice]) -> Union[Data, "Trajectories"]:
         """Select Transition or sub trajectory."""
         with self.lock.reader():
             selected = self.data[idx]

@@ -20,15 +20,14 @@ def compose(*transforms: Callable) -> Callable:
 class WithReturns:
     """Transform class for transitions to add a the return to every item."""
 
-    discount: float = .9
+    discount: float = 0.9
     normalize: bool = True
 
     _Transition: type = attr.ib(init=False)
 
     def __call__(self, trajectory: List[Any]) -> List[Any]:
         """Add the return to every item in the trajectory."""
-        rewards = torch.tensor(
-            [t.reward for t in trajectory], dtype=torch.float32)
+        rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         returns = Firl.returns(rewards, self.discount)
         if self.normalize:
             returns = Firl.normalize_1d(returns)
@@ -37,13 +36,15 @@ class WithReturns:
             self._Transition = attr.make_class(
                 trajectory[0].__class__.__name__,
                 ["retrn"],
-                bases=(trajectory[0].__class__, ),
+                bases=(trajectory[0].__class__,),
                 frozen=True,
-                slots=True
+                slots=True,
             )
 
-        return [self._Transition(**attr.asdict(t, recurse=False), retrn=r)
-                for t, r in zip(trajectory, returns.tolist())]
+        return [
+            self._Transition(**attr.asdict(t, recurse=False), retrn=r)
+            for t, r in zip(trajectory, returns.tolist())
+        ]
 
 
 @attr.s(auto_attribs=True)
@@ -54,8 +55,8 @@ class WithGAE:
     estimation to every item.
     """
 
-    discount: float = .99
-    lambda_: float = .9
+    discount: float = 0.99
+    lambda_: float = 0.9
     normalize: bool = True
     dtype: torch.dtype = torch.float32
 
@@ -67,7 +68,7 @@ class WithGAE:
         values = [t.critic_value for t in trajectory]
         if trajectory[-1].done:
             # Value of terminal state is zero
-            values.append(0.)
+            values.append(0.0)
         else:
             # Missing the critic value for the next observation
             # We shorten the trajectory by one
@@ -82,21 +83,23 @@ class WithGAE:
                 values=values,
                 discount=self.discount,
                 lambda_=self.lambda_,
-                normalize=self.normalize
+                normalize=self.normalize,
             )
 
         if not hasattr(self, "_Transition"):
             self._Transition = attr.make_class(
                 trajectory[0].__class__.__name__,
                 ["gae"],
-                bases=(trajectory[0].__class__, ),
+                bases=(trajectory[0].__class__,),
                 frozen=True,
-                slots=True
+                slots=True,
             )
 
         # trunctation done by zip if reward is smaller than transitions
-        return [self._Transition(**attr.asdict(t, recurse=False), gae=g)
-                for t, g in zip(trajectory, gae.tolist())]
+        return [
+            self._Transition(**attr.asdict(t, recurse=False), gae=g)
+            for t, g in zip(trajectory, gae.tolist())
+        ]
 
 
 @attr.s(auto_attribs=True)

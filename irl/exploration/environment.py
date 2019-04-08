@@ -25,9 +25,7 @@ class Environment(Generic[Action, Observation], ABC):
     """
 
     @abstractmethod
-    def step(
-        self, action: Action
-    ) -> Tuple[Observation, float, bool, Dict[str, Any]]:
+    def step(self, action: Action) -> Tuple[Observation, float, bool, Dict[str, Any]]:
         """Take an action in the environement.
 
         Parameters
@@ -85,9 +83,7 @@ class TensorEnv(Environment, Generic[Action, Observation]):
         """All other attributes are gotten from base_env."""
         return getattr(self.base_env, name)
 
-    def step(
-        self, action: Action
-    ) -> Tuple[Observation, float, bool, Dict[str, Any]]:
+    def step(self, action: Action) -> Tuple[Observation, float, bool, Dict[str, Any]]:
         """Take an action in the environement."""
         action = apply_to_tensor(action, lambda t: t.cpu().numpy())
         obs, reward, done, info = self.base_env.step(action)

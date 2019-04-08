@@ -13,17 +13,14 @@ class Obs:
 
 
 def test_compose():
-    f = T.compose(
-        lambda x: x+2,
-        lambda y: y**2
-    )
+    f = T.compose(lambda x: x + 2, lambda y: y ** 2)
     assert f(0) == 4
 
 
 def test_WithReturns():
     Transition = attr.make_class("Transition", ("reward", "obs"))
     trajectory = [Transition(i, Obs()) for i in range(4)]
-    transform = T.WithReturns(discount=.1, normalize=True)
+    transform = T.WithReturns(discount=0.1, normalize=True)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
@@ -35,10 +32,9 @@ def test_WithReturns():
 
 
 def test_WithGAE():
-    Transition = attr.make_class(
-        "T", ("reward", "critic_value", "done", "obs"))
-    trajectory = [Transition(i, 3., False, Obs()) for i in range(4)]
-    transform = T.WithGAE(discount=.1, normalize=True, lambda_=.9)
+    Transition = attr.make_class("T", ("reward", "critic_value", "done", "obs"))
+    trajectory = [Transition(i, 3.0, False, Obs()) for i in range(4)]
+    transform = T.WithGAE(discount=0.1, normalize=True, lambda_=0.9)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
@@ -48,13 +44,13 @@ def test_WithGAE():
     assert all(hasattr(t, "obs") for t in transformed)
     assert all(isinstance(t.obs, Obs) for t in transformed)
 
-    trajectory.append(Transition(9, 3., True, Obs()))
+    trajectory.append(Transition(9, 3.0, True, Obs()))
     transformed = transform(trajectory)
     assert len(transformed) == len(trajectory)
 
 
 def test_PinIfCuda(device):
-    Transition = attr.make_class("Transition", ("x", ), bases=(data.Data, ))
+    Transition = attr.make_class("Transition", ("x",), bases=(data.Data,))
     trajectory = [Transition(torch.rand(5, device=device)) for _ in range(4)]
     transform = T.PinIfCuda(device=device)
 

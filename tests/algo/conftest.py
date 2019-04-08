@@ -11,11 +11,7 @@ class Model(nn.Module):
     """A simple test model."""
 
     def __init__(
-        self,
-        dim_in: int,
-        dim_out: int,
-        continuous: bool = False,
-        critic: bool = False
+        self, dim_in: int, dim_out: int, continuous: bool = False, critic: bool = False
     ) -> None:
         """Initialize model."""
         super().__init__()
@@ -27,7 +23,7 @@ class Model(nn.Module):
         """Forward pass."""
         h = self.lin(obs)
         if self.continuous:
-            probs = distrib.Normal(h, 1.)
+            probs = distrib.Normal(h, 1.0)
         else:
             probs = distrib.Categorical(logits=h)
         if self.critic is not None:
@@ -41,7 +37,8 @@ class Model(nn.Module):
             dim_in=self.lin.in_features,
             dim_out=self.lin.out_features,
             continuous=self.continuous,
-            critic=True)
+            critic=True,
+        )
 
 
 @pytest.fixture

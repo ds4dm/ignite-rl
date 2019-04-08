@@ -21,6 +21,8 @@ def device(request) -> torch.device:
 @pytest.fixture(params=["CartPole-v1", "MountainCarContinuous-v0"])
 def env_factory(request) -> gym.Env:
     """RL environment to test against."""
+
     def factory():
         return TensorEnv(gym.make(request.param))
+
     return factory

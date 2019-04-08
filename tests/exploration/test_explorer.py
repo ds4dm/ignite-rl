@@ -15,7 +15,7 @@ class Env:
     def step(self, action):
         self.cnt += 1
         obs = torch.rand(10)
-        return obs, 1., self.cnt > 10, {}
+        return obs, 1.0, self.cnt > 10, {}
 
     def reset(self):
         self.cnt = 0
@@ -62,11 +62,7 @@ def test_explorer(env_factory):
 
 
 def test_explorer_cast(device):
-    explorer = Explorer(
-        Env(),
-        lambda x, y: (None, {}),
-        dtype=torch.int,
-        device=device)
+    explorer = Explorer(Env(), lambda x, y: (None, {}), dtype=torch.int, device=device)
     explorer.run(10, 1)
 
     # Observation are casted lazily

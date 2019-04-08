@@ -40,6 +40,7 @@ def every(steps: int, start: bool = False) -> Decorator:
         The decorator to use on a function.
 
     """
+
     def decorator(func: Callable) -> Callable:
         step_count = -1 if start else 0
 
@@ -55,21 +56,20 @@ def every(steps: int, start: bool = False) -> Decorator:
                 return None
 
         return new_func
+
     return decorator
 
 
 def apply_to_tensor(
     input: Union[Any, Sequence, Mapping],
-    function: Callable[[torch.Tensor], torch.Tensor]
+    function: Callable[[torch.Tensor], torch.Tensor],
 ) -> Union[Any, Sequence, Mapping]:
     """Apply a function on a tensor, a sequence, or a mapping of tensors."""
     return apply_to_type(input, torch.Tensor, function)
 
 
 def apply_to_type(
-    input: Union[Any, Sequence, Mapping],
-    in_type,
-    function: Callable
+    input: Union[Any, Sequence, Mapping], in_type, function: Callable
 ) -> Union[Any, Sequence, Mapping]:
     """Apply a function on elements of a given type.
 
@@ -81,12 +81,10 @@ def apply_to_type(
     elif isinstance(input, collections.abc.Mapping):
         values = list(input.values())
         if len(values) > 0 and isinstance(values[0], in_type):
-            return {k: apply_to_type(v, in_type, function)
-                    for k, v in input.items()}
+            return {k: apply_to_type(v, in_type, function) for k, v in input.items()}
     elif isinstance(input, collections.abc.Sequence):
         if len(input) > 0 and isinstance(input[0], in_type):
-            return [apply_to_type(sample, in_type, function)
-                    for sample in input]
+            return [apply_to_type(sample, in_type, function) for sample in input]
     return input
 
 
@@ -101,11 +99,13 @@ def _from_numpy_sparse(
         return torch.sparse_coo_tensor(
             indices=torch.from_numpy(np.vstack((t_coo.row, t_coo.col))),
             values=t_coo.data,
-            size=t_coo.shape
+            size=t_coo.shape,
         ).to(dtype)
     else:
-        raise TypeError("Argument of type {t.__class__} is neither a"
-                        "numpy array not a scipy sparse matrix.")
+        raise TypeError(
+            "Argument of type {t.__class__} is neither a"
+            "numpy array not a scipy sparse matrix."
+        )
 
 
 def from_numpy_sparse(
@@ -113,9 +113,8 @@ def from_numpy_sparse(
 ) -> Union[Any, Sequence, Mapping]:
     """Convert numpy arrays and scipys sparse matrices to Tensors."""
     return apply_to_type(
-        input,
-        in_type=(np.ndarray, sp.spmatrix),
-        function=_from_numpy_sparse)
+        input, in_type=(np.ndarray, sp.spmatrix), function=_from_numpy_sparse
+    )
 
 
 def default_merge(

@@ -9,7 +9,7 @@ import irl.exploration.datasets as D
 
 def test_Trajectories():
     Trans = attr.make_class("Transition", ("val", "done"))
-    ds = D.Trajectories(lambda traj: [x.val**2 for x in traj])
+    ds = D.Trajectories(lambda traj: [x.val ** 2 for x in traj])
 
     ds.concat([Trans(1, False), Trans(2, False), Trans(3, True)])
     assert len(ds) == len(ds.data) == 3
@@ -58,7 +58,7 @@ def test_parallel_Trajectories():
 
 
 def test_MemoryReplay():
-    ds = D.MemoryReplay(lambda x: x-1, capacity=3)
+    ds = D.MemoryReplay(lambda x: x - 1, capacity=3)
 
     for i in range(3):
         ds.append(i)

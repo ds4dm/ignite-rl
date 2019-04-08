@@ -9,13 +9,14 @@ import irl.functional as Firl
 def test_value_td_residuals(device):
     values = torch.rand(11, device=device)
     reward = torch.rand(10, device=device)
-    Firl.value_td_residuals(reward, values[:-1], values[1:], .9)
+    Firl.value_td_residuals(reward, values[:-1], values[1:], 0.9)
 
 
 def test_discounted_sum(device):
     X = torch.arange(4, dtype=torch.float, device=device)
     expected = torch.tensor(
-        [0.1234, 1.234, 2.34, 3.4], device=device, dtype=torch.float)
+        [0.1234, 1.234, 2.34, 3.4], device=device, dtype=torch.float
+    )
     result = Firl.discounted_sum(X, 0.1, last=4)
     assert result.device == device
     assert (result == expected).all().item()
@@ -30,8 +31,7 @@ def test_normalize_1d(device):
 
 def test_generalize_advatange_estimation(device):
     Firl.generalize_advatange_estimation(
-        torch.rand(10, device=device),
-        torch.rand(11, device=device)
+        torch.rand(10, device=device), torch.rand(11, device=device)
     )
 
 

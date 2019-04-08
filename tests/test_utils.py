@@ -49,7 +49,7 @@ def test_apply_to_type():
 
 def test_from_numpy_sparse():
     x = np.random.rand(10, 10)
-    x[x < .7] = 0
+    x[x < 0.7] = 0
     x_t = utils._from_numpy_sparse(x)
 
     assert isinstance(x_t, torch.Tensor)

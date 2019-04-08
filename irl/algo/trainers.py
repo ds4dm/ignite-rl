@@ -23,12 +23,12 @@ Trainer = Engine
 def create_ppo_trainer(
     actor_critic: nn.Module,
     optimizer: optim.Optimizer,
-    ppo_clip: float = .02,
-    exploration_loss_coef: float = .001,
-    critic_loss_coef: float = 1.,
+    ppo_clip: float = 0.02,
+    exploration_loss_coef: float = 0.001,
+    critic_loss_coef: float = 1.0,
     critic_loss_function: Callable = F.mse_loss,
     device: Optional[torch.device] = None,
-    dtype: Optional[torch.dtype] = None
+    dtype: Optional[torch.dtype] = None,
 ) -> Trainer:
     """Create a trainer to optimize a model with PPO-clip loss.
 
@@ -67,12 +67,12 @@ def create_ppo_trainer(
             targets=batch.gae.detach(),
             log_probs=log_probs,
             old_log_probs=batch.log_prob.detach(),
-            ppo_clip=ppo_clip
+            ppo_clip=ppo_clip,
         )
         entropy_loss = action_distribs.entropy().mean()
-        loss += (exploration_loss_coef * entropy_loss)
+        loss += exploration_loss_coef * entropy_loss
         critic_loss = critic_loss_function(critic_values, batch.retrn)
-        loss += (critic_loss_coef * critic_loss)
+        loss += critic_loss_coef * critic_loss
 
         optimizer.zero_grad()
         loss.backward()

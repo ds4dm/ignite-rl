@@ -13,7 +13,7 @@ def value_td_residuals(
     rewards: torch.Tensor,
     values: torch.Tensor,
     next_values: torch.Tensor,
-    discount: float
+    discount: float,
 ) -> torch.Tensor:
     """Compute TD residual of state value function.
 
@@ -36,9 +36,7 @@ def value_td_residuals(
 
 
 @singledispatch
-def discounted_sum(
-    X: list, discount: float, last: float = 0.
-) -> torch.Tensor:
+def discounted_sum(X: list, discount: float, last: float = 0.0) -> torch.Tensor:
     """Compute a discounted sum for every element.
 
     Given a one dimension input `x` of size `n`, the output tensor has size `n`
@@ -54,24 +52,18 @@ def discounted_sum(
 
 
 @discounted_sum.register
-def _(
-    X: np.ndarray, discount: float, last: float = 0.
-) -> torch.Tensor:
+def _(X: np.ndarray, discount: float, last: float = 0.0) -> torch.Tensor:
     output = discounted_sum(X.tolist(), discount=discount, last=last)
     return np.array(output, dtype=np.float32)
 
 
 @discounted_sum.register
-def _(
-    X: torch.Tensor, discount: float, last: float = 0.
-) -> torch.Tensor:
+def _(X: torch.Tensor, discount: float, last: float = 0.0) -> torch.Tensor:
     output = discounted_sum(X.cpu().numpy(), discount=discount, last=last)
     return torch.from_numpy(output).to(dtype=torch.float, device=X.device)
 
 
-def returns(
-    rewards: torch.Tensor, discount: float, last: float = 0.
-) -> torch.Tensor:
+def returns(rewards: torch.Tensor, discount: float, last: float = 0.0) -> torch.Tensor:
     """Compute the disounted returns given the rewards.
 
     This is equivalent to `discoutned_sum`. This is valid only for one
@@ -88,9 +80,9 @@ def normalize_1d(x: torch.Tensor) -> torch.Tensor:
 def generalize_advatange_estimation(
     rewards: torch.Tensor,
     values: torch.Tensor,
-    discount: float = .99,
-    lambda_: float = .9,
-    normalize: bool = True
+    discount: float = 0.99,
+    lambda_: float = 0.9,
+    normalize: bool = True,
 ) -> torch.Tensor:
     """Compute generalize advatange estimation.
 
@@ -99,21 +91,18 @@ def generalize_advatange_estimation(
     This is valid only for one trajectory.
     """
     v_td_residuals = value_td_residuals(
-        rewards=rewards,
-        values=values[:-1],
-        next_values=values[1:],
-        discount=discount
+        rewards=rewards, values=values[:-1], next_values=values[1:], discount=discount
     )
     if normalize:
         v_td_residuals = normalize_1d(v_td_residuals)
-    return discounted_sum(v_td_residuals, discount*lambda_)
+    return discounted_sum(v_td_residuals, discount * lambda_)
 
 
 def ppo_loss(
     targets: torch.Tensor,
     log_probs: torch.Tensor,
     old_log_probs: torch.Tensor,
-    ppo_clip: float = .02
+    ppo_clip: float = 0.02,
 ) -> torch.Tensor:
     """Compute the PPO loss.
 
@@ -139,4 +128,4 @@ def ppo_loss(
     prob_ratio = torch.exp(log_probs - old_log_probs.detach())
     loss1 = prob_ratio * _targets
     loss2 = torch.clamp(prob_ratio, 1.0 - ppo_clip, 1.0 + ppo_clip) * _targets
-    return - torch.min(loss1, loss2).mean()
+    return -torch.min(loss1, loss2).mean()
