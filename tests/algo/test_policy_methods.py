@@ -3,6 +3,8 @@
 import torch
 import mock
 
+from ignite.engine import Events
+
 import irl.algo.policy_methods
 
 
@@ -73,3 +75,25 @@ def test_ppo_optimizer_called(device, env_factory, model):
     agent.run(10, 2)
     optimizer.step.call_count > 1
     optimizer.zero_grad.call_count > 1
+
+
+def test_ppo_trainer_override(device, env_factory, model):
+    model = model.new_with_critic()
+    optimizer = mock.MagicMock()
+    agent = irl.algo.policy_methods.create_ppo(
+        env=env_factory(),
+        actor_critic=model,
+        optimizer=optimizer,
+        dataset_size=4,
+        batch_size=2,
+        device=device,
+        dtype=torch.float32,
+    )
+
+    @agent.on(Events.STARTED)
+    def _change_trainer(engine):
+        engine.state.trainer = mock.MagicMock()
+
+    agent.run(10, 2)
+    assert not optimizer.called
+    assert agent.state.trainer.run.call_count > 1

@@ -322,7 +322,7 @@ def create_ppo(
                 collate_fn=sample_elem.__class__.collate,
                 drop_last=True,
             )
-            trainer.run(dataloader, n_epochs)
+            engine.state.trainer.run(dataloader, n_epochs)
             engine.state.trajectories.clear()
 
     return agent
