@@ -16,7 +16,6 @@ passed to `Trajectory` method to merge observations or actions.
 """
 
 from typing import Callable, Optional, Generic
-import numbers
 
 import attr
 import torch
@@ -97,7 +96,7 @@ class Explorer(Engine):
                 state.observation_dev = state.observation
 
         def _process_func(engine, timestep):
-            """Take action on each iteeration."""
+            """Take action on each iteration."""
             # Store timestep for user
             engine.state.episode_timestep = timestep
 
@@ -180,6 +179,8 @@ class Explorer(Engine):
 
         Store the value of the transition members (registered with
         `register_transition_members`) to be added in the next transition.
+        It is safe to call this function multiple times. The members stored are
+        deleted after each iteration/timestep.
 
         Parameters
         ----------
@@ -188,7 +189,10 @@ class Explorer(Engine):
             value.
 
         """
-        engine.state.extra_transition_members = members
+        if hasattr(engine.state, "extra_transition_members"):
+            engine.state.extra_transition_members.update(members)
+        else:
+            engine.state.extra_transition_members = members
 
     def run(
         self,

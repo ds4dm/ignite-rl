@@ -69,3 +69,20 @@ def test_explorer_cast(device):
     @explorer.on(Events.ITERATION_STARTED)
     def _test(engine):
         assert engine.state.observation.device == device
+
+
+def test_explorer_transition_members():
+    explorer = Explorer(Env(), lambda x, y: None)
+    explorer.register_transition_members("foo", "bar")
+
+    @explorer.on(Events.ITERATION_STARTED)
+    def _add_foo(engine):
+        engine.store_transition_members(foo=3, bar=4)
+        assert engine.state.extra_transition_members == {"foo": 3, "bar": 4}
+        engine.store_transition_members(foo=0)
+        assert engine.state.extra_transition_members == {"foo": 0, "bar": 4}
+
+    explorer.run(3, 2)
+
+    assert explorer.state.transition.bar == 4
+    assert not hasattr(explorer.state, "extra_transition_members")
