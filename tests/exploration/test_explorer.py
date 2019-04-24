@@ -15,7 +15,7 @@ class Env:
     def step(self, action):
         self.cnt += 1
         obs = torch.rand(10)
-        return obs, 1.0, self.cnt > 10, {}
+        return obs, 1.0, self.cnt > 10, {"info_member": 33}
 
     def reset(self):
         self.cnt = 0
@@ -86,3 +86,10 @@ def test_explorer_transition_members():
 
     assert explorer.state.transition.bar == 4
     assert not hasattr(explorer.state, "extra_transition_members")
+
+
+def test_explorer_transition_members_info():
+    explorer = Explorer(Env(), lambda x, y: None)
+    explorer.register_transition_members("info_member")
+    explorer.run(3, 2)
+    assert hasattr(explorer.state.transition, "info_member")

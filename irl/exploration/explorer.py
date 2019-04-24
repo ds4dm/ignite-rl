@@ -108,13 +108,21 @@ class Explorer(Engine):
             next_observation = next_observation.to(dtype=dtype)
 
             # We create the transition object and store it.
+            required_fields = [
+                name
+                for name, attrib in attr.fields_dict(
+                    engine.state.TransitionClass
+                ).items()
+                if attrib.init
+            ]
             engine.state.transition = engine.state.TransitionClass(
                 observation=engine.state.observation,
                 action=action,
                 next_observation=next_observation,
                 reward=reward,
                 done=done,
-                **getattr(engine.state, "extra_transition_members", {})
+                **getattr(engine.state, "extra_transition_members", {}),
+                **{k: v for k, v in infos.items() if k in required_fields},
             )
             # Cleaning to avoid exposing unecessary information
             if hasattr(engine.state, "extra_transition_members"):
@@ -151,8 +159,9 @@ class Explorer(Engine):
     def register_transition_members(engine, *names: str, **name_attribs) -> None:
         """Register extra members to be stored in the transition object.
 
-        At every step, the method `store_transition_members` must be called
-        to store the extra members.
+        At every step, either the method `store_transition_members` must be
+        called to store the extra members, or the member must be present in
+        the environment info.
 
         Parameters
         ----------
