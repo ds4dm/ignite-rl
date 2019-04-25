@@ -3,10 +3,32 @@
 """Utilities to create pytorch data classes."""
 
 from typing import Optional, Callable, Sequence
+import enum
 
 import attr
 import torch
 from torch.utils.data.dataloader import default_collate
+
+
+class _AutoName(enum.Enum):
+    """Enum class to override `auto` behaviour."""
+
+    def _generate_next_value_(name, start, count, last_values):
+        """Return the name of the enum attribute for `auto`."""
+        return name
+
+
+class AttribMeta(_AutoName):
+    """Attributes used in `Data` class `attr.ib` attributes.
+
+    Attributes
+    ----------
+    COLLATE:
+        A function used to collate (batch) the specific attribute.
+
+    """
+
+    COLLATE: Callable = enum.auto()
 
 
 class Data:
@@ -69,20 +91,23 @@ class Data:
             return cls.__batched_Class
 
     @classmethod
-    def collate(cls, points: Sequence["Data"]) -> "Batch_Data":
+    def collate(cls, points: Sequence["Data"]) -> "Data":
         """Collate a list of points into a batched class.
 
         The class used for batching can be found in `cls.batched_Class` and
         contains similar fields as this class.
         """
         batch_dict = {}
-        for name in attr.fields_dict(cls):
-            member_list = [getattr(p, name) for p in points]
-            if isinstance(member_list[0], Data):
-                klass = member_list[0].__class__
-                batch_dict[name] = klass.collate(member_list)
-            else:
-                batch_dict[name] = default_collate(member_list)
+        for name, attrib in attr.fields_dict(cls).items():
+            if attrib.init:
+                member_list = [getattr(p, name) for p in points]
+                if AttribMeta.COLLATE in attrib.metadata:
+                    collator = attrib.metadata[AttribMeta.COLLATE]
+                elif isinstance(member_list[0], Data):
+                    collator = member_list[0].__class__.collate
+                else:
+                    collator = default_collate
+                batch_dict[name] = collator(member_list)
         return cls.get_batch_class()(**batch_dict)
 
     @classmethod

@@ -4,7 +4,7 @@ import attr
 import torch
 import mock
 
-from irl.exploration.data import Data
+from irl.exploration.data import Data, AttribMeta
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
@@ -18,6 +18,7 @@ class Example(Data):
     a: torch.Tensor = torch.rand(10)
     b: int = 0
     c: Something = Something()
+    d: list = attr.ib(default="d", metadata={AttribMeta.COLLATE: " ".join})
 
 
 def test_data_move(device):
@@ -42,7 +43,7 @@ def test_pin_memory(device):
 
 def test_get_batched_class():
     BatchClass = Example.get_batch_class()
-    assert len(attr.fields(BatchClass)) == 3
+    assert len(attr.fields(BatchClass)) == 4
 
 
 def test_collate():
@@ -59,6 +60,7 @@ def test_collate():
     assert batch.c.x.dtype == torch.int64  # unconcistent in pytorch
     assert isinstance(batch.c.y, torch.Tensor)
     assert batch.c.y.shape == (2, 3)
+    assert batch.d == "d d"
 
 
 def test_from_dict():
