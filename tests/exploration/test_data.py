@@ -57,7 +57,7 @@ def test_collate():
     assert isinstance(batch.c, Something.get_batch_class())
     assert isinstance(batch.c.x, torch.Tensor)
     assert batch.c.x.shape == (2,)
-    assert batch.c.x.dtype == torch.int64  # unconcistent in pytorch
+    assert batch.c.x.dtype == torch.uint8
     assert isinstance(batch.c.y, torch.Tensor)
     assert batch.c.y.shape == (2, 3)
     assert batch.d == "d d"
