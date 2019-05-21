@@ -3,7 +3,7 @@
 """Dataset transforms."""
 
 from functools import reduce, partial
-from typing import Callable, List, Any, Optional
+from typing import Callable, List, Any, Dict, Hashable
 
 import attr
 import torch
@@ -12,12 +12,58 @@ import torch.nn.functional as F
 import irl.functional as Firl
 
 
+@attr.s(auto_attribs=True)
+class _MultiTaskNormalizer:
+    """Normalize and keep track of running averages.
+
+    Running averages are kept by task, being given an id.
+    Do not use for contextual bandit as the return is set to zero in some
+    edge case to avoid unscaled gradients.
+    """
+
+    running_means: Dict[Hashable, torch.Tensor] = attr.Factory(dict)
+    running_vars: Dict[Hashable, torch.Tensor] = attr.Factory(dict)
+    epsilon: float = 1e-5
+
+    def normalize(self, x: torch.Tensor, task_id: Hashable = None) -> torch.Tensor:
+        """Normalize input and store running avgs."""
+        can_norm = len(x) > 1
+        # Warm starting the scaling factors
+        if task_id not in self.running_means:
+            if can_norm:
+                self.running_means[task_id] = x.mean().unsqueeze(0)
+                self.running_vars[task_id] = x.var(unbiased=False).unsqueeze(0)
+            else:
+                # Single reward on unknown task: avoid unknown gradients
+                return x.new_zeros(1)
+
+        # Running avgs updated if we can_norm, otherwise used to normalize.
+        return F.batch_norm(
+            x.unsqueeze(1),
+            running_mean=self.running_means[task_id],
+            running_var=self.running_vars[task_id],
+            training=can_norm,
+            eps=self.epsilon,
+        ).squeeze(1)
+
+    def denormalize(self, y: torch.Tensor, task_id: Hashable = None) -> torch.Tensor:
+        """Reverse the opertion of normalization using the running avgs.
+
+        If no running avgs are found, the input is return as is.
+        """
+        if task_id in self.running_means:
+            mean = self.running_means[task_id]
+            var = self.running_vars[task_id]
+            return y * torch.sqrt(var + self.epsilon) + mean
+        else:
+            return y
+
+
 def compose(*transforms: Callable) -> Callable:
     """Retrun the composed of all the given functions."""
     return partial(reduce, lambda x, f: f(x), transforms)
 
 
-@attr.s(auto_attribs=True)
 class WithReturns:
     """Transform class for transitions to add a the return to every item.
 
@@ -25,30 +71,21 @@ class WithReturns:
     for the normalization itself).
     """
 
-    discount: float = 0.9
-    normalize: bool = True
-
-    running_mean: Optional[torch.Tensor] = attr.ib(init=False, default=None)
-    running_var: Optional[torch.Tensor] = attr.ib(init=False, default=None)
-    _Transition: Optional[type] = attr.ib(init=False, default=None)
+    def __init__(self, discount: float = 0.9, normalize: bool = True) -> None:
+        """Initialize the normalizer if necessary."""
+        self.discount = discount
+        self._Transition = None
+        if normalize:
+            self.normalizer = _MultiTaskNormalizer()
+        else:
+            self.normalizer = None
 
     def __call__(self, trajectory: List[Any]) -> List[Any]:
         """Add the return to every item in the trajectory."""
         rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         returns = Firl.returns(rewards, self.discount)
-        if self.normalize:
-            # Warm starting the scaling factors
-            if self.running_mean is None:
-                self.running_mean = returns.mean().unsqueeze(0)
-            if self.running_var is None:
-                self.running_var = returns.var().unsqueeze(0)
-            # Running averages not used in th results, simply updated
-            returns = F.batch_norm(
-                returns.unsqueeze(1),
-                running_mean=self.running_mean,
-                running_var=self.running_var,
-                training=True,
-            ).squeeze(1)
+        if self.normalizer is not None:
+            returns = self.normalizer.normalize(returns)
 
         if self._Transition is None:
             self._Transition = attr.make_class(
