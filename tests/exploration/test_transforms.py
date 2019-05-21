@@ -30,6 +30,11 @@ def test_WithReturns():
     assert all(hasattr(t, "obs") for t in transformed)
     assert all(isinstance(t.obs, Obs) for t in transformed)
 
+    assert isinstance(transform.running_mean, torch.Tensor)
+    assert transform.running_mean.shape == (1,)
+    assert isinstance(transform.running_var, torch.Tensor)
+    assert transform.running_var.shape == (1,)
+
 
 def test_WithGAE():
     Transition = attr.make_class("T", ("reward", "critic_value", "done", "obs"))

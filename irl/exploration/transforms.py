@@ -3,10 +3,11 @@
 """Dataset transforms."""
 
 from functools import reduce, partial
-from typing import Callable, List, Any
+from typing import Callable, List, Any, Optional
 
 import attr
 import torch
+import torch.nn.functional as F
 
 import irl.functional as Firl
 
@@ -18,21 +19,38 @@ def compose(*transforms: Callable) -> Callable:
 
 @attr.s(auto_attribs=True)
 class WithReturns:
-    """Transform class for transitions to add a the return to every item."""
+    """Transform class for transitions to add a the return to every item.
+
+    When nomralizing, the running mean and variance are computed (but not used
+    for the normalization itself).
+    """
 
     discount: float = 0.9
     normalize: bool = True
 
-    _Transition: type = attr.ib(init=False)
+    running_mean: Optional[torch.Tensor] = attr.ib(init=False, default=None)
+    running_var: Optional[torch.Tensor] = attr.ib(init=False, default=None)
+    _Transition: Optional[type] = attr.ib(init=False, default=None)
 
     def __call__(self, trajectory: List[Any]) -> List[Any]:
         """Add the return to every item in the trajectory."""
         rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         returns = Firl.returns(rewards, self.discount)
         if self.normalize:
-            returns = Firl.normalize_1d(returns)
+            # Warm starting the scaling factors
+            if self.running_mean is None:
+                self.running_mean = returns.mean().unsqueeze(0)
+            if self.running_var is None:
+                self.running_var = returns.var().unsqueeze(0)
+            # Running averages not used in th results, simply updated
+            returns = F.batch_norm(
+                returns.unsqueeze(1),
+                running_mean=self.running_mean,
+                running_var=self.running_var,
+                training=True,
+            ).squeeze(1)
 
-        if not hasattr(self, "_Transition"):
+        if self._Transition is None:
             self._Transition = attr.make_class(
                 trajectory[0].__class__.__name__,
                 ["retrn"],
