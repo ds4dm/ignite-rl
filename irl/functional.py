@@ -84,9 +84,11 @@ def generalize_advatange_estimation(
     v_td_residuals = value_td_residuals(
         rewards=rewards, values=values[:-1], next_values=values[1:], discount=discount
     )
+    gae = discounted_sum(v_td_residuals, discount * lambda_)
     if normalize:
-        v_td_residuals = normalize_1d(v_td_residuals)
-    return discounted_sum(v_td_residuals, discount * lambda_)
+        return normalize_1d(gae)
+    else:
+        return gae
 
 
 def ppo_loss(
