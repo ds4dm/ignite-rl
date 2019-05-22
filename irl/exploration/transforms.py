@@ -2,6 +2,7 @@
 
 """Dataset transforms."""
 
+import logging
 from functools import reduce, partial
 from typing import Callable, List, Any, Dict, Hashable
 
@@ -10,6 +11,9 @@ import torch
 import torch.nn.functional as F
 
 import irl.functional as Firl
+
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s(auto_attribs=True)
@@ -35,6 +39,9 @@ class _MultiTaskNormalizer:
                 self.running_vars[task_id] = x.var(unbiased=False).unsqueeze(0)
             else:
                 # Single reward on unknown task: avoid unknown gradients
+                logger.warning(
+                    "Trajectory with length 1 for unknown task. Normalization is 0."
+                )
                 return x.new_zeros(1)
 
         # Running avgs updated if we can_norm, otherwise used to normalize.
@@ -56,6 +63,7 @@ class _MultiTaskNormalizer:
             var = self.running_vars[task_id]
             return y * torch.sqrt(var + self.epsilon) + mean
         else:
+            logger.warning("Denormalizing unknown task (no-opt).")
             return y
 
 
