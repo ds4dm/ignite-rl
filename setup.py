@@ -21,5 +21,5 @@ setup(
     # Testing
     # usage: python setup.py pytest --addopts --cov=irl
     setup_requires=[] + pytest_runner,
-    tests_require=["pytest", "pytest-cov", "mock", "gym"],
+    tests_require=["pytest", "pytest-cov", "pytest-timeout", "mock", "gym"],
 )
