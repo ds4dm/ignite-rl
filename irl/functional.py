@@ -36,7 +36,7 @@ def value_td_residuals(
 
 
 @singledispatch
-def discounted_sum(X: list, discount: float, last: float = 0.0) -> torch.Tensor:
+def discounted_sum(X: list, discount: float) -> torch.Tensor:
     """Compute a discounted sum for every element.
 
     Given a one dimension input `x` of size `n`, the output tensor has size `n`
@@ -44,7 +44,7 @@ def discounted_sum(X: list, discount: float, last: float = 0.0) -> torch.Tensor:
         out[j] = sum_{0 <= i < n-j} x[i+j] * discount**j
     """
     outputs = []
-    d = last
+    d = 0.0
     for x in X[::-1]:
         d = discount * d + x
         outputs.append(d)
@@ -52,28 +52,19 @@ def discounted_sum(X: list, discount: float, last: float = 0.0) -> torch.Tensor:
 
 
 @discounted_sum.register
-def _(X: np.ndarray, discount: float, last: float = 0.0) -> torch.Tensor:
-    output = discounted_sum(X.tolist(), discount=discount, last=last)
+def _(X: np.ndarray, discount: float) -> torch.Tensor:
+    output = discounted_sum(X.tolist(), discount=discount)
     return np.array(output, dtype=np.float32)
 
 
 @discounted_sum.register
-def _(X: torch.Tensor, discount: float, last: float = 0.0) -> torch.Tensor:
-    output = discounted_sum(X.cpu().numpy(), discount=discount, last=last)
-    return torch.from_numpy(output).to(dtype=torch.float, device=X.device)
-
-
-def returns(rewards: torch.Tensor, discount: float, last: float = 0.0) -> torch.Tensor:
-    """Compute the disounted returns given the rewards.
-
-    This is equivalent to `discoutned_sum`. This is valid only for one
-    trajectory.
-    """
-    return discounted_sum(rewards, discount=discount, last=last)
+def _(X: torch.Tensor, discount: float) -> torch.Tensor:
+    output = discounted_sum(X.cpu().numpy(), discount=discount)
+    return torch.from_numpy(output).to(dtype=X.dtype, device=X.device)
 
 
 def normalize_1d(x: torch.Tensor) -> torch.Tensor:
-    """Normalize a 1 dimnesional tensor."""
+    """Normalize a 1 dimensional tensor."""
     return F.batch_norm(x.unsqueeze(1), None, None, training=True).squeeze(1)
 
 

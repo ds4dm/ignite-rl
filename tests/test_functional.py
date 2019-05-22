@@ -14,10 +14,8 @@ def test_value_td_residuals(device):
 
 def test_discounted_sum(device):
     X = torch.arange(4, dtype=torch.float, device=device)
-    expected = torch.tensor(
-        [0.1234, 1.234, 2.34, 3.4], device=device, dtype=torch.float
-    )
-    result = Firl.discounted_sum(X, 0.1, last=4)
+    expected = torch.tensor([0.123, 1.23, 2.3, 3], device=device, dtype=torch.float)
+    result = Firl.discounted_sum(X, 0.1)
     assert result.device == device
     assert (result == expected).all().item()
 
