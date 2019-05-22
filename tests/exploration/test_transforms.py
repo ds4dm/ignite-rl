@@ -2,6 +2,7 @@
 
 import attr
 import torch
+import mock
 
 import irl.exploration.transforms as T
 import irl.exploration.data as data
@@ -13,6 +14,8 @@ class Obs:
 
 
 def approx_eq(x: torch.Tensor, y: torch.Tensor, epsilon: float = 1e-5) -> bool:
+    if not isinstance(x, torch.Tensor):
+        x = torch.tensor(x)
     return torch.all(torch.abs(x - y) < epsilon).item()
 
 
@@ -52,9 +55,9 @@ def test_MultiTaskNormalizer_denormalize():
 
 
 def test_WithReturns():
-    Transition = attr.make_class("Transition", ("reward", "obs"))
-    trajectory = [Transition(i, Obs()) for i in range(4)]
-    transform = T.WithReturns(discount=0.1, normalize=True)
+    Transition = attr.make_class("Transition", ("reward", "obs", "done"))
+    trajectory = [Transition(i, Obs(), i == 3) for i in range(4)]
+    transform = T.WithReturns(discount=0.1, norm_returns=True)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
@@ -70,10 +73,39 @@ def test_WithReturns():
     assert running_mean.shape == (1,)
 
 
-def test_WithGAE():
+def test_WithReturns_bootstrap():
+    Transition = attr.make_class(
+        "Transition", ("reward", "obs", "done", "critic_value")
+    )
+    trajectory = [Transition(i, Obs(), False, 2) for i in range(4)]
+    transform = T.WithReturns(discount=1.0, norm_returns=False)
+
+    transformed = transform(trajectory)
+    assert len(transformed) == len(trajectory)
+    assert transformed[-1].retrn == 2
+    assert approx_eq(transformed[-2].retrn, 2 + 2)
+
+
+def test_WithReturns_Normalize():
+    Transition = attr.make_class(
+        "Transition", ("reward", "obs", "done", "critic_value")
+    )
+    transform = T.WithReturns(norm_returns=True)
+    transform.normalizer = mock.MagicMock(wraps=transform.normalizer)
+
+    trajectory1 = [Transition(i, Obs(), i == 3, 2) for i in range(4)]
+    transform(trajectory1)
+    assert transform.normalizer.normalize.called
+
+    trajectory2 = [Transition(i, Obs(), False, 2) for i in range(4)]
+    transform(trajectory2)
+    assert transform.normalizer.denormalize.called
+
+
+def test_WithGAEs():
     Transition = attr.make_class("T", ("reward", "critic_value", "done", "obs"))
     trajectory = [Transition(i, 3.0, False, Obs()) for i in range(4)]
-    transform = T.WithGAE(discount=0.1, normalize=True, lambda_=0.9)
+    transform = T.WithGAEs(discount=0.1, norm_returns=True, norm_gaes=True, lambda_=0.9)
 
     transformed = transform(trajectory)
     assert isinstance(transformed, list)
@@ -86,6 +118,19 @@ def test_WithGAE():
     trajectory.append(Transition(9, 3.0, True, Obs()))
     transformed = transform(trajectory)
     assert len(transformed) == len(trajectory)
+
+
+def test_WithGAEs_Normalize():
+    Transition = attr.make_class("T", ("reward", "critic_value", "done", "obs"))
+    trajectory = [Transition(i, 3.0, i == 3, Obs()) for i in range(4)]
+    transform = T.WithGAEs(discount=0.1, norm_returns=True, norm_gaes=True, lambda_=0.9)
+    transform.normalizer = mock.MagicMock(wraps=transform.normalizer)
+
+    transform(trajectory)
+    assert transform.normalizer.normalize.called
+    assert transform.normalizer.denormalize.called
+    # First call first args
+    assert len(transform.normalizer.denormalize.call_args[0][0]) == len(trajectory) + 1
 
 
 def test_PinIfCuda(device):

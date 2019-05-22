@@ -24,7 +24,7 @@ def create_reinforce(
     optimizer: optim.Optimizer,
     discount: float = 0.99,
     exploration: float = 0.001,
-    normalize_returns: bool = False,
+    norm_returns: bool = True,
     grad_norm_clip: Optional[float] = 1.0,
     dtype: Optional[torch.dtype] = None,
     device: Optional[torch.device] = None,
@@ -43,7 +43,7 @@ def create_reinforce(
         The discount rate used for computing the returns.
     exploration:
         The entropy bonus for encouraging exploration.
-    normalize_returns:
+    norm_returns:
         Whether to normalize the rewards with zero mean and unit variance.
         Computed over an episode. Raise an error for episode of length 1.
     grad_norm_clip:
@@ -77,7 +77,7 @@ def create_reinforce(
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
         engine.state.trajectories = Trajectories(
-            T.WithReturns(discount=discount, normalize=normalize_returns)
+            T.WithReturns(discount=discount, norm_returns=norm_returns)
         )
 
     @agent.on(Events.EPOCH_STARTED)
@@ -111,7 +111,7 @@ def create_a2c(
     optimizer: optim.Optimizer,
     discount: float = 0.99,
     exploration: float = 0.001,
-    normalize_returns: bool = False,
+    norm_returns: bool = True,
     critic_loss: Callable = F.mse_loss,
     critic_multiplier: float = 1.0,
     grad_norm_clip: Optional[float] = 1.0,
@@ -133,7 +133,7 @@ def create_a2c(
         The discount rate used for computing the returns.
     exploration:
         The entropy bonus for encouraging exploration.
-    normalize_returns:
+    norm_returns:
         Whether to normalize the rewards with zero mean and unit variance.
         Computed over an episode. Raise an error for episode of length 1.
     critic_loss:
@@ -173,7 +173,7 @@ def create_a2c(
     @agent.on(Events.STARTED)
     def add_trajectories_to_engine(engine):
         engine.state.trajectories = Trajectories(
-            T.WithReturns(discount=discount, normalize=normalize_returns)
+            T.WithReturns(discount=discount, norm_returns=norm_returns)
         )
 
     @agent.on(Events.EPOCH_STARTED)
@@ -213,8 +213,8 @@ def create_ppo(
     exploration_loss_coef: float = 0.001,
     critic_loss_coef: float = 1.0,
     critic_loss_function: Callable = F.mse_loss,
-    # FIX normalization
-    normalize_advantages: bool = False,
+    norm_returns: bool = True,
+    norm_gaes: bool = True,
     dataset_size: int = 1024,
     n_epochs: int = 10,
     # FIXME change the way the dataloader is passed on to the function
@@ -245,9 +245,14 @@ def create_ppo(
         Mutiplier for the critic loss.
     critic_loss_function:
         Loss function used by the critic.
-    normalize_advantages:
-        Whether to normalize the advantages with zero mean and unit variance.
-        Computed over an episode. Raise an error for episode of length 1.
+    norm_returns:
+        Whether to normalize returns. Running averages are kept per task
+        (use `task_id` to differentiate tasks) and used to scale back critic
+        for bootstrapping and GAEs.
+    norm_gaes:
+        Whether to normalize the advantages. Independant from the normalization
+        of returns that is used to scale back the critic. This happens on
+        the final advantages.
     dataset_size:
         Size of the PPO dataset to collect information from agents.
     n_epoch:
@@ -295,10 +300,12 @@ def create_ppo(
     def add_trajectories_and_trainer_to_engine(engine):
         engine.state.trajectories = Trajectories(
             T.compose(
-                T.WithGAE(
-                    discount=discount, lambda_=lambda_, normalize=normalize_advantages
+                T.WithGAEs(
+                    discount=discount,
+                    lambda_=lambda_,
+                    norm_gaes=norm_gaes,
+                    norm_returns=norm_returns,
                 ),
-                T.WithReturns(discount=discount, normalize=False),
                 T.PinIfCuda(device=device),
             )
         )

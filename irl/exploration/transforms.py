@@ -75,25 +75,71 @@ def compose(*transforms: Callable) -> Callable:
 class WithReturns:
     """Transform class for transitions to add a the return to every item.
 
-    When nomralizing, the running mean and variance are computed (but not used
-    for the normalization itself).
+    If a trajectory is not terminated, and a critic is available, it is used
+    to bootstrap the returns. When normalizing, the running mean and variance
+    are computed (but not used for the normalization itself) and kept per task
+    (use `task_id` in the transition to keep different values). They are used
+    to scale back the critic when bootstrapping.
     """
 
-    def __init__(self, discount: float = 0.9, normalize: bool = True) -> None:
-        """Initialize the normalizer if necessary."""
+    def __init__(
+        self,
+        discount: float = 0.9,
+        norm_returns: bool = True,
+        dtype: torch.dtype = torch.float32,
+    ) -> None:
+        """Initialize the transform.
+
+        Parameters
+        ----------
+        discount:
+            The discount rate applied to compute the returns from the rewards.
+        norm_returns:
+            Whether to normalize the returns. Running averages are kept per
+            task (use `task_id` in the transition to keep different values)
+            and used to scale the critic back when bootstrapping.
+        dtype:
+            The type in which the returns are computed.
+
+        """
         self.discount = discount
+        self.dtype = dtype
         self._Transition = None
-        if normalize:
+        if norm_returns:
             self.normalizer = _MultiTaskNormalizer()
         else:
             self.normalizer = None
 
+    def returns(self, trajectory: List[Any], rewards: torch.Tensor) -> torch.Tensor:
+        """Compute the returns, possibly bootstrp and scale from critic."""
+        full_trajectory = trajectory[-1].done
+        task_id = getattr(trajectory[0], "task_id", None)
+
+        # Bootstrp from critic if possible
+        if not full_trajectory:
+            if hasattr(trajectory[-1], "critic_value"):
+                last_critic_val = trajectory[-1].critic_value
+                if self.normalizer is not None:
+                    last_critic_val = self.normalizer.denormalize(
+                        last_critic_val, task_id=task_id
+                    )
+                rewards[-1] = last_critic_val
+            else:
+                logger.warning(
+                    "Computing returns for uncomplete trajectory without a critic."
+                )
+        returns = Firl.discounted_sum(rewards, self.discount)
+        # Scale the returns if necessary and store running averages
+        if self.normalizer is not None:
+            returns = self.normalizer.normalize(returns, task_id=task_id)
+
+        return returns
+
     def __call__(self, trajectory: List[Any]) -> List[Any]:
         """Add the return to every item in the trajectory."""
         rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
-        returns = Firl.returns(rewards, self.discount)
-        if self.normalizer is not None:
-            returns = self.normalizer.normalize(returns)
+        with torch.no_grad():
+            returns = self.returns(trajectory, rewards=rewards)
 
         if self._Transition is None:
             self._Transition = attr.make_class(
@@ -110,49 +156,81 @@ class WithReturns:
         ]
 
 
-@attr.s(auto_attribs=True)
-class WithGAE:
+class WithGAEs(WithReturns):
     """Generalized Advantage Estimation.
 
     Transform class for transitions to add a the generalized advantage
     estimation to every item.
+    The class also compute the returns wioth bootstrapping. If scaling of
+    the returns is used, the running average (per task) are used to scale
+    back the critic estimate to compute the GAEs.
     """
 
-    discount: float = 0.99
-    lambda_: float = 0.9
-    normalize: bool = True
-    dtype: torch.dtype = torch.float32
+    def __init__(
+        self,
+        discount: float = 0.99,
+        lambda_: float = 0.9,
+        norm_returns: bool = True,
+        norm_gaes: bool = True,
+        dtype: torch.dtype = torch.float32,
+    ) -> None:
+        """Initialize the transform.
 
-    _Transition: type = attr.ib(init=False)
+        Parameters
+        ----------
+        discount:
+            The discount rate applied to compute the returns from the rewards.
+        lambda_:
+            Second discount factor for generalized advantages estimation.
+        norm_returns:
+            Whether to normalize the returns. Running averages are kept per
+            task (use `task_id` in the transition to keep different values)
+            and used to scale the critic back when bootstrapping.
+        norm_gaes:
+            Whether to normalize the GAEs computed.
+        dtype:
+            The type in which the returns are computed.
 
-    def __call__(self, trajectory: List[Any]) -> List[Any]:
-        """Add the return to every item in the trajectory."""
-        rewards = [t.reward for t in trajectory]
+        """
+        super().__init__(discount=discount, norm_returns=norm_returns, dtype=dtype)
+        self.lambda_ = lambda_
+        self.norm_gaes = norm_gaes
+
+    def gaes(self, trajectory: List[Any], rewards: torch.Tensor) -> torch.Tensor:
+        """Return the generalized adgantages estimation."""
+        full_trajectory = trajectory[-1].done
+        task_id = getattr(trajectory[0], "task_id", None)
+
         values = [t.critic_value for t in trajectory]
-        if trajectory[-1].done:
-            # Value of terminal state is zero
-            values.append(0.0)
+        if full_trajectory:
+            values.append(0.0)  # Value of terminal state is zero
         else:
             # Missing the critic value for the next observation
             # We shorten the trajectory by one
-            del rewards[-1]
+            rewards = rewards[:-1]
+        values = torch.tensor(values, dtype=self.dtype)
+        if self.normalizer is not None:
+            values = self.normalizer.denormalize(values, task_id=task_id)
 
+        return Firl.generalize_advatange_estimation(
+            rewards=rewards,
+            values=values,
+            discount=self.discount,
+            lambda_=self.lambda_,
+            normalize=self.norm_gaes,
+        )
+
+    def __call__(self, trajectory: List[Any]) -> List[Any]:
+        """Add the return and gae to every item in the trajectory."""
+        rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         with torch.no_grad():
-            rewards = torch.tensor(rewards, dtype=self.dtype)
-            values = torch.tensor(values, dtype=self.dtype)
+            returns = self.returns(trajectory, rewards=rewards)
+            gaes = self.gaes(trajectory, rewards=rewards)
 
-            gae = Firl.generalize_advatange_estimation(
-                rewards=rewards,
-                values=values,
-                discount=self.discount,
-                lambda_=self.lambda_,
-                normalize=self.normalize,
-            )
-
-        if not hasattr(self, "_Transition"):
+        if self._Transition is None:
             self._Transition = attr.make_class(
                 trajectory[0].__class__.__name__,
-                ["gae"],
+                ["retrn", "gae"],
                 bases=(trajectory[0].__class__,),
                 frozen=True,
                 slots=True,
@@ -160,8 +238,8 @@ class WithGAE:
 
         # trunctation done by zip if reward is smaller than transitions
         return [
-            self._Transition(**attr.asdict(t, recurse=False), gae=g)
-            for t, g in zip(trajectory, gae.tolist())
+            self._Transition(**attr.asdict(t, recurse=False), retrn=r, gae=g)
+            for t, r, g in zip(trajectory, returns.tolist(), gaes.tolist())
         ]
 
 
