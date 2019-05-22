@@ -71,7 +71,7 @@ def create_ppo_trainer(
         )
         entropy_loss = action_distribs.entropy().mean()
         loss += exploration_loss_coef * entropy_loss
-        critic_loss = critic_loss_function(critic_values, batch.retrn)
+        critic_loss = critic_loss_function(critic_values.squeeze(1), batch.retrn)
         loss += critic_loss_coef * critic_loss
 
         optimizer.zero_grad()
