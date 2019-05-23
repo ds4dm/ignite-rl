@@ -135,7 +135,7 @@ def test_WithGAEs_Normalize():
 
 def test_PinIfCuda(device):
     Transition = attr.make_class("Transition", ("x",), bases=(data.Data,))
-    trajectory = [Transition(torch.rand(5, device=device)) for _ in range(4)]
+    trajectory = [Transition(torch.rand(5)) for _ in range(4)]
     transform = T.PinIfCuda(device=device)
 
     transformed = transform(trajectory)
