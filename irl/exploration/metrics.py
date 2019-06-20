@@ -4,6 +4,7 @@
 
 import abc
 
+import torch
 import ignite.metrics
 
 
@@ -35,9 +36,13 @@ class EpisodeAccumulation(ignite.metrics.Metric, abc.ABC):
     def compute(self) -> float:
         """Return the final aggregated measure."""
         if self.average:
-            return self.val / self.num
+            out = self.val / self.num
         else:
-            return self.val
+            out = self.val
+        if isinstance(out, torch.Tensor) and out.numel() == 1:
+            return out.item()
+        else:
+            return out
 
 
 class TransitionMetric(EpisodeAccumulation):

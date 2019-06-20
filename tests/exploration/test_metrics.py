@@ -30,8 +30,7 @@ def test_TransitionMetric():
 
 
 def test_Return():
-    agent = Explorer(lambda eng, obs: None)
-    metrics.Return().attach(agent, "Return")
+    agent = Explorer(lambda eng, obs: None, metrics={"Return": metrics.Return()})
     agent.run(Env(), 2)
     assert agent.state.metrics["Return"] == 6
 

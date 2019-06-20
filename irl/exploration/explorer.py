@@ -15,11 +15,12 @@ free to define their own types. For these particluar cases, a function can be
 passed to `Trajectory` method to merge observations or actions.
 """
 
-from typing import Callable, Optional, Generic
+from typing import Callable, Optional, Generic, Dict
 import itertools
 
 import attr
 import torch
+import ignite.metrics
 from ignite.engine import Engine, Events, State
 
 from .environment import Observation, Action, Environment
@@ -67,6 +68,7 @@ class Explorer(Engine):
     def __init__(
         self,
         select_action: Callable[[Engine, Observation], Action],
+        metrics: Optional[Dict[str, ignite.metrics.Metric]] = None,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
     ) -> Engine:
@@ -151,6 +153,10 @@ class Explorer(Engine):
             obs = engine.state.env.reset().to(dtype=dtype)
             engine.state.observation = obs
             engine.state.observation_dev = self._maybe_pin(obs, device)
+
+        if metrics is not None:
+            for name, metric in metrics.items():
+                metric.attach(self, name)
 
     def register_transition_members(engine, *names: str, **name_attribs) -> None:
         """Register extra members to be stored in the transition object.
