@@ -132,6 +132,8 @@ class Explorer(Engine):
             if done:  # Iteration events still fired.
                 engine.terminate_epoch()
 
+            return engine.state.transition, engine.state.environment_info
+
         super().__init__(_process_func)
 
         @self.on(Events.STARTED)
