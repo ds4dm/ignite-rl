@@ -58,9 +58,10 @@ class _MultiTaskNormalizer:
 
         If no running avgs are found, the input is return as is.
         """
+        convert = y if isinstance(y, torch.Tensor) else None
         if task_id in self.running_means:
-            mean = self.running_means[task_id].to(y)
-            var = self.running_vars[task_id].to(y)
+            mean = self.running_means[task_id].to(convert)
+            var = self.running_vars[task_id].to(convert)
             return y * torch.sqrt(var + self.epsilon) + mean
         else:
             logger.warning("Denormalizing unknown task (no-opt).")

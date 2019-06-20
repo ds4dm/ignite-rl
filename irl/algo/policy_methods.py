@@ -11,7 +11,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from ignite.engine import Events
 
-from irl.exploration.environment import Environment
 from irl.exploration.explorer import Explorer
 from irl.exploration.datasets import Trajectories
 import irl.algo.trainers as trainers
@@ -19,7 +18,6 @@ import irl.exploration.transforms as T
 
 
 def create_reinforce(
-    env: Environment,
     policy: nn.Module,
     optimizer: optim.Optimizer,
     discount: float = 0.99,
@@ -33,8 +31,6 @@ def create_reinforce(
 
     Parameters
     ----------
-    env:
-        The environment the agent interacts with.
     policy:
         The neural network used to model the policy.
     optimizer:
@@ -70,7 +66,7 @@ def create_reinforce(
         )
         return action
 
-    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
+    agent = Explorer(select_action=select_action, dtype=dtype, device=device)
 
     agent.register_transition_members("log_prob", "entropy")
 
@@ -106,7 +102,6 @@ def create_reinforce(
 
 
 def create_a2c(
-    env: Environment,
     actor_critic: nn.Module,
     optimizer: optim.Optimizer,
     discount: float = 0.99,
@@ -122,8 +117,6 @@ def create_a2c(
 
     Parameters
     ----------
-    env:
-        The environment the agent interacts with.
     actor_critic:
         The neural network used to model the policy and critic. Must return a
         tuple (action probalility distribution, critic value).
@@ -166,7 +159,7 @@ def create_a2c(
         )
         return action
 
-    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
+    agent = Explorer(select_action=select_action, dtype=dtype, device=device)
 
     agent.register_transition_members("log_prob", "entropy", "critic_value")
 
@@ -204,7 +197,6 @@ def create_a2c(
 
 
 def create_ppo(
-    env: Environment,
     actor_critic: nn.Module,
     optimizer: optim.Optimizer,
     discount: float = 0.99,
@@ -226,8 +218,6 @@ def create_ppo(
 
     Parameters
     ----------
-    env:
-        The environment the agent interacts with.
     actor_critic:
         The neural network used to model the policy and critic. Must return a
         tuple (action probalility distribution, critic value).
@@ -283,7 +273,7 @@ def create_ppo(
             )
             return action
 
-    agent = Explorer(env=env, select_action=select_action, dtype=dtype, device=device)
+    agent = Explorer(select_action=select_action, dtype=dtype, device=device)
     agent.register_transition_members("log_prob", "entropy", "critic_value")
     trainer = trainers.create_ppo_trainer(
         actor_critic=actor_critic,

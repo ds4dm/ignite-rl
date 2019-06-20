@@ -44,8 +44,8 @@ def test_transition(device):
 def test_explorer_mock():
     select_action = mock.MagicMock()
     select_action.return_value = 1, {}
-    explorer = Explorer(Env(), select_action)
-    explorer.run(100, 2)
+    explorer = Explorer(select_action)
+    explorer.run(Env(), 2)
 
     assert select_action.call_count == 22
     assert isinstance(explorer.state.transition, Transition)
@@ -57,13 +57,13 @@ def test_explorer(env_factory):
     def select_action(engine, iter):
         return env.action_space.sample()
 
-    explorer = Explorer(env, select_action)
-    explorer.run(10, 2)
+    explorer = Explorer(select_action)
+    explorer.run(env, 2)
 
 
 def test_explorer_cast(device):
-    explorer = Explorer(Env(), lambda x, y: (None, {}), dtype=torch.int, device=device)
-    explorer.run(10, 1)
+    explorer = Explorer(lambda x, y: (None, {}), dtype=torch.int, device=device)
+    explorer.run(Env(), 1)
 
     # Observation are casted lazily
     @explorer.on(Events.ITERATION_STARTED)
@@ -72,7 +72,7 @@ def test_explorer_cast(device):
 
 
 def test_explorer_transition_members():
-    explorer = Explorer(Env(), lambda x, y: None)
+    explorer = Explorer(lambda x, y: None)
     explorer.register_transition_members("foo", "bar")
 
     @explorer.on(Events.ITERATION_STARTED)
@@ -82,14 +82,14 @@ def test_explorer_transition_members():
         engine.store_transition_members(foo=0)
         assert engine.state.extra_transition_members == {"foo": 0, "bar": 4}
 
-    explorer.run(3, 2)
+    explorer.run(Env(), 2)
 
     assert explorer.state.transition.bar == 4
     assert not hasattr(explorer.state, "extra_transition_members")
 
 
 def test_explorer_transition_members_info():
-    explorer = Explorer(Env(), lambda x, y: None)
+    explorer = Explorer(lambda x, y: None)
     explorer.register_transition_members("info_member")
-    explorer.run(3, 2)
+    explorer.run(Env(), 2)
     assert hasattr(explorer.state.transition, "info_member")
