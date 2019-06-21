@@ -13,6 +13,7 @@ ipython = "*"
 isort = "*"
 black = "*"
 python-language-server = {extras = ["mccabe", "pydocstyle", "pyflakes", "rope"],version = "*"}
+jupyter = "*"
 
 [requires]
 python_version = "3.7"

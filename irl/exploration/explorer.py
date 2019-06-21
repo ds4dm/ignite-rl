@@ -15,13 +15,14 @@ free to define their own types. For these particluar cases, a function can be
 passed to `Trajectory` method to merge observations or actions.
 """
 
-from typing import Callable, Optional, Generic
+from typing import Callable, Optional, Generic, Dict
+import itertools
 
 import attr
 import torch
+import ignite.metrics
 from ignite.engine import Engine, Events, State
 
-import irl.utils as utils
 from .environment import Observation, Action, Environment
 from .data import Data
 
@@ -56,10 +57,18 @@ class Explorer(Engine):
         The current observation, moved accross devices.
     """
 
+    @staticmethod
+    def _maybe_pin(obs: Observation, device: torch.device) -> Observation:
+        """Return a pinned observation if necessary."""
+        if device is not None and torch.device(device).type == "cuda":
+            return obs.pin_memory()
+        else:
+            return obs
+
     def __init__(
         self,
-        env: Environment,
         select_action: Callable[[Engine, Observation], Action],
+        metrics: Optional[Dict[str, ignite.metrics.Metric]] = None,
         dtype: Optional[torch.dtype] = None,
         device: Optional[torch.device] = None,
     ) -> Engine:
@@ -67,8 +76,6 @@ class Explorer(Engine):
 
         Parameters
         ----------
-        env:
-            The environment to explore.
         select_action:
             A function used to select an action. Has access to the engine and
             the iteration number. The current observation is stored under
@@ -84,27 +91,14 @@ class Explorer(Engine):
 
         """
 
-        def _maybe_pin(state):
-            """Pin observation if necessary.
-
-            Set the attribute `observation_dev` with a pinned version
-            of observation if necessary.
-            """
-            if device is not None and torch.device(device).type == "cuda":
-                state.observation_dev = state.observation.pin_memory()
-            else:
-                state.observation_dev = state.observation
-
-        def _process_func(engine, timestep):
+        def _process_func(engine, episode_timestep):
             """Take action on each iteration."""
-            # Store timestep for user
-            engine.state.episode_timestep = timestep
-
+            self.state.episode_timestep = episode_timestep
             # Select action.
             action = select_action(engine, engine.state.observation_dev)
 
             # Make action.
-            next_observation, reward, done, infos = env.step(action)
+            next_observation, reward, done, infos = engine.state.env.step(action)
             next_observation = next_observation.to(dtype=dtype)
 
             # We create the transition object and store it.
@@ -134,10 +128,13 @@ class Explorer(Engine):
             # Save for next move
             # Observation on cpu (untouched)
             engine.state.observation = next_observation
-            _maybe_pin(engine.state)
+            # observation on device fo passing to select_action
+            engine.state.observation_dev = self._maybe_pin(next_observation, device)
 
             if done:  # Iteration events still fired.
                 engine.terminate_epoch()
+
+            return engine.state.transition, engine.state.environment_info
 
         super().__init__(_process_func)
 
@@ -153,8 +150,13 @@ class Explorer(Engine):
 
         @self.on(Events.EPOCH_STARTED)
         def _init_episode(engine):
-            engine.state.observation = env.reset().to(dtype=dtype)
-            _maybe_pin(engine.state)
+            obs = engine.state.env.reset().to(dtype=dtype)
+            engine.state.observation = obs
+            engine.state.observation_dev = self._maybe_pin(obs, device)
+
+        if metrics is not None:
+            for name, metric in metrics.items():
+                metric.attach(self, name)
 
     def register_transition_members(engine, *names: str, **name_attribs) -> None:
         """Register extra members to be stored in the transition object.
@@ -203,18 +205,13 @@ class Explorer(Engine):
         else:
             engine.state.extra_transition_members = members
 
-    def run(
-        self,
-        max_episode_length: Optional[int] = None,
-        max_episodes: Optional[int] = None,
-    ) -> State:
+    def run(self, env: Environment, max_episodes: Optional[int] = None) -> State:
         """Run the explorer.
 
         Parameters
         ----------
-        max_episode_length:
-            Episode are truncated after this number of timesteps. Use `None`
-            to not use truncation.
+        env:
+            The RL environement in which the agent interacts.
         max_episodes:
             Number of episode to run for.
 
@@ -224,7 +221,12 @@ class Explorer(Engine):
             The state of the engine.
 
         """
+
+        @self.on(Events.STARTED)
+        def _save_env(engine):
+            engine.state.env = env
+
         return super().run(
-            utils.Range(max_episode_length),
+            itertools.count(),
             max_epochs=(float("inf") if max_episodes is None else max_episodes),
         )

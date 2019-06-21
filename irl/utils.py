@@ -138,21 +138,6 @@ def default_merge(
     return seq
 
 
-class Range:
-    """Simple range that supports None for infinity."""
-
-    def __init__(self, end=None):
-        """Initialize object."""
-        self._end = end
-
-    def __iter__(self):
-        """Iterate over a possibly infiite range."""
-        if (self._end is None) or (math.isinf(self._end) and self._end > 0):
-            return itertools.count()
-        else:
-            return iter(range(self._end))
-
-
 class RWLock(object):
     """Reader-writer lock with preference to writers.
 
