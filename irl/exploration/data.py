@@ -9,16 +9,10 @@ import attr
 import torch
 from torch.utils.data.dataloader import default_collate
 
-
-class _AutoName(enum.Enum):
-    """Enum class to override `auto` behaviour."""
-
-    def _generate_next_value_(name, start, count, last_values):
-        """Return the name of the enum attribute for `auto`."""
-        return name
+import irl.utils as utils
 
 
-class AttribMeta(_AutoName):
+class AttribMeta(utils.NameEnum):
     """Attributes used in `Data` class `attr.ib` attributes.
 
     Attributes

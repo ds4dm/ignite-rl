@@ -2,13 +2,12 @@
 
 """Utilities."""
 
+import enum
 import threading
 import contextlib
-import itertools
 import collections.abc
 from functools import wraps
 from numbers import Number
-import math
 from typing import Callable, Sequence, Mapping, Union, Any, Optional
 
 import attr
@@ -18,6 +17,14 @@ import torch
 
 
 Decorator = Callable[[Callable], Callable]
+
+
+class NameEnum(enum.Enum):
+    """Enum class to override `auto` behaviour."""
+
+    def _generate_next_value_(name, start, count, last_values):
+        """Return the name of the enum attribute for `auto`."""
+        return name.lower()
 
 
 def every(steps: int, start: bool = False) -> Decorator:
