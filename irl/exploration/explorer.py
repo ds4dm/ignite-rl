@@ -205,7 +205,9 @@ class Explorer(Engine):
         else:
             engine.state.extra_transition_members = members
 
-    def run(self, env: Environment, max_episodes: Optional[int] = None) -> State:
+    def run(
+        self, env: Environment[Action, Observation], max_episodes: Optional[int] = None
+    ) -> State:
         """Run the explorer.
 
         Parameters
