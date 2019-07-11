@@ -7,7 +7,7 @@ import torch.distributions as distrib
 import pytest
 
 
-class Model(nn.Module):
+class ProbPolicy(nn.Module):
     """A simple test model."""
 
     def __init__(
@@ -31,9 +31,9 @@ class Model(nn.Module):
         else:
             return probs
 
-    def new_with_critic(self) -> "Model":
+    def new_with_critic(self) -> "ProbPolicy":
         """Return a similar model with a critic."""
-        return Model(
+        return ProbPolicy(
             dim_in=self.lin.in_features,
             dim_out=self.lin.out_features,
             continuous=self.continuous,
@@ -42,8 +42,8 @@ class Model(nn.Module):
 
 
 @pytest.fixture
-def model(env_factory) -> nn.Module:
-    """Policy relevant for the enviornment."""
+def prob_policy(env_factory) -> nn.Module:
+    """ProbPolicy relevant for the enviornment."""
     env = env_factory()
     dim_in, = env.observation_space.shape
     continuous = isinstance(env.action_space, gym.spaces.Box)
@@ -51,4 +51,4 @@ def model(env_factory) -> nn.Module:
         dim_out, = env.action_space.shape
     else:
         dim_out = env.action_space.n
-    return Model(dim_in, dim_out, continuous)
+    return ProbPolicy(dim_in, dim_out, continuous)
