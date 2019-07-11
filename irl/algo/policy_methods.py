@@ -3,6 +3,7 @@
 """Collection of policy learning algorithms."""
 
 from typing import Optional, Callable
+from functools import partial
 
 import torch
 import torch.nn as nn
@@ -296,7 +297,7 @@ def create_ppo(
                     norm_gaes=norm_gaes,
                     norm_returns=norm_returns,
                 ),
-                T.PinIfCuda(device=device),
+                partial(map, T.PinIfCuda(device=device)),
             )
         )
         engine.state.trainer = trainer

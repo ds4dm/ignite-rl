@@ -3,6 +3,7 @@
 import attr
 import torch
 import mock
+from functools import partial
 
 import irl.exploration.transforms as T
 import irl.exploration.data as data
@@ -133,13 +134,24 @@ def test_WithGAEs_Normalize():
     assert len(transform.normalizer.denormalize.call_args[0][0]) == len(trajectory) + 1
 
 
-def test_PinIfCuda(device):
+def test_PinIfCuda_transtition(device):
     Transition = attr.make_class("Transition", ("x",), bases=(data.Data,))
-    trajectory = [Transition(torch.rand(5)) for _ in range(4)]
+    transition = Transition(torch.rand(5))
     transform = T.PinIfCuda(device=device)
 
-    transformed = transform(trajectory)
-    assert isinstance(transformed, list)
+    transformed = transform(transition)
+    assert isinstance(transformed, Transition)
+    assert isinstance(transformed.x, torch.Tensor)
+    if device.type == "cuda":
+        assert transformed.x.is_pinned()
+
+
+def test_PinIfCuda_trajectory(device):
+    Transition = attr.make_class("Transition", ("x",), bases=(data.Data,))
+    trajectory = [Transition(torch.rand(5)) for _ in range(4)]
+    transform = partial(map, T.PinIfCuda(device=device))
+
+    transformed = list(transform(trajectory))
     assert len(transformed) == len(trajectory)
     assert all(isinstance(t.x, torch.Tensor) for t in transformed)
     if device.type == "cuda":

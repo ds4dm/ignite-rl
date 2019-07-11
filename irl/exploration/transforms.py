@@ -4,13 +4,14 @@
 
 import logging
 from functools import reduce, partial
-from typing import Callable, List, Any, Dict, Hashable
+from typing import Callable, List, Dict, Hashable
 
 import attr
 import torch
 import torch.nn.functional as F
 
 import irl.functional as Firl
+from irl.exploration.explorer import Transition
 
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,9 @@ class WithReturns:
         else:
             self.normalizer = None
 
-    def returns(self, trajectory: List[Any], rewards: torch.Tensor) -> torch.Tensor:
+    def returns(
+        self, trajectory: List[Transition], rewards: torch.Tensor
+    ) -> torch.Tensor:
         """Compute the returns, possibly bootstrp and scale from critic."""
         full_trajectory = trajectory[-1].done
         task_id = getattr(trajectory[0], "task_id", None)
@@ -136,7 +139,7 @@ class WithReturns:
 
         return returns
 
-    def __call__(self, trajectory: List[Any]) -> List[Any]:
+    def __call__(self, trajectory: List[Transition]) -> List[Transition]:
         """Add the return to every item in the trajectory."""
         rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         with torch.no_grad():
@@ -197,7 +200,7 @@ class WithGAEs(WithReturns):
         self.lambda_ = lambda_
         self.norm_gaes = norm_gaes
 
-    def gaes(self, trajectory: List[Any], rewards: torch.Tensor) -> torch.Tensor:
+    def gaes(self, trajectory: List[Transition], rewards: torch.Tensor) -> torch.Tensor:
         """Return the generalized adgantages estimation."""
         full_trajectory = trajectory[-1].done
         task_id = getattr(trajectory[0], "task_id", None)
@@ -221,7 +224,7 @@ class WithGAEs(WithReturns):
             normalize=self.norm_gaes,
         )
 
-    def __call__(self, trajectory: List[Any]) -> List[Any]:
+    def __call__(self, trajectory: List[Transition]) -> List[Transition]:
         """Add the return and gae to every item in the trajectory."""
         rewards = torch.tensor([t.reward for t in trajectory], dtype=torch.float32)
         with torch.no_grad():
@@ -250,9 +253,9 @@ class PinIfCuda:
 
     device: torch.device = attr.ib(converter=torch.device)
 
-    def __call__(self, trajectory: List[Any]) -> List[Any]:
+    def __call__(self, transition: Transition) -> Transition:
         """Return the list of pined transitions, if the device is Cuda."""
         if self.device.type == "cuda":
-            return [t.pin_memory() for t in trajectory]
+            return transition.pin_memory()
         else:
-            return trajectory
+            return transition
