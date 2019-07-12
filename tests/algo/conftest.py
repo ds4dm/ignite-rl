@@ -1,19 +1,23 @@
 # coding: utf-8
 
+"""Pytest fixtures and utilities for testing algorithms."""
+
 import gym
 import torch
 import torch.nn as nn
 import torch.distributions as distrib
 import pytest
 
+from irl.algo.value_methods import TensorQValues
+
 
 class ProbPolicy(nn.Module):
-    """A simple test model."""
+    """A simple test probabilistic policy."""
 
     def __init__(
         self, dim_in: int, dim_out: int, continuous: bool = False, critic: bool = False
     ) -> None:
-        """Initialize model."""
+        """Initialize probabilistic policy."""
         super().__init__()
         self.lin = nn.Linear(dim_in, dim_out)
         self.critic = nn.Linear(dim_in, 1) if critic else None
@@ -32,7 +36,7 @@ class ProbPolicy(nn.Module):
             return probs
 
     def new_with_critic(self) -> "ProbPolicy":
-        """Return a similar model with a critic."""
+        """Return a similar probabilistic policy with a critic."""
         return ProbPolicy(
             dim_in=self.lin.in_features,
             dim_out=self.lin.out_features,
@@ -43,7 +47,7 @@ class ProbPolicy(nn.Module):
 
 @pytest.fixture
 def prob_policy(env_factory) -> nn.Module:
-    """ProbPolicy relevant for the enviornment."""
+    """Create a ProbPolicy relevant for the environment."""
     env = env_factory()
     dim_in, = env.observation_space.shape
     continuous = isinstance(env.action_space, gym.spaces.Box)
@@ -52,3 +56,27 @@ def prob_policy(env_factory) -> nn.Module:
     else:
         dim_out = env.action_space.n
     return ProbPolicy(dim_in, dim_out, continuous)
+
+
+class DQN(nn.Module):
+    """A simple test deep Q network."""
+
+    def __init__(self, dim_in: int, dim_out: int) -> None:
+        """Initialize a deep Q network."""
+        super().__init__()
+        self.lin = nn.Linear(dim_in, dim_out)
+
+    def forward(self, obs: torch.Tensor) -> distrib.Distribution:
+        """Forward pass."""
+        return TensorQValues(self.lin(obs))
+
+
+@pytest.fixture
+def dqn(env_factory) -> nn.Module:
+    """Createa a DQN relevant for the environment."""
+    env = env_factory()
+    if isinstance(env.action_space, gym.spaces.Box):
+        pytest.skip("DQN is not suitted for continuous environment.")
+    dim_in, = env.observation_space.shape
+    dim_out = env.action_space.n
+    return DQN(dim_in, dim_out)

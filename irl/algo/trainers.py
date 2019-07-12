@@ -7,6 +7,7 @@ event encapsualte a all iteration done on a same dataset.
 """
 
 from typing import Optional, Callable
+import enum
 
 import torch
 import torch.nn as nn
@@ -14,6 +15,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from ignite.engine import Engine
 
+import irl.utils as utils
 import irl.functional as Firl
 
 
@@ -82,3 +84,98 @@ def create_ppo_trainer(
 
     trainer = Engine(optimize)
     return trainer
+
+
+class QLearningMode(utils.NameEnum):
+    """Q-learning modes.
+
+    Simple is normal q learning, target uses a target network for making and
+    evaluating target V values, double use a target network to evaluate the
+    action of the DQN.
+    """
+
+    SIMPLE = enum.auto()
+    TARGET = enum.auto()
+    DOUBLE = enum.auto()
+
+
+def create_qlearning_trainer(
+    dqn: nn.Module,  # Callable[[Observation], QValues]
+    target_dqn: Optional[nn.Module],  # Callable[[Observation], QValues]
+    optimizer: optim.Optimizer,
+    discount: float = 0.99,
+    evaluation_mode: QLearningMode = QLearningMode.DOUBLE,
+    loss_func: Callable = F.mse_loss,
+    clip_grad_norm: Optional[float] = None,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+) -> Trainer:
+    """Optimize a dataset a DQN on a dataset of transition.
+
+    Optimization is done using TD(0) deep q learning, with memory replay.
+    Double and tartget evaluation are also available.
+
+    Parameters
+    ----------
+    dqn:
+        The neural network estimating qvalues tht is being optimized.
+    target_dqn:
+        Optional second network for target or double q-learning evaluation.
+    optimizer:
+        The optimizer used to update the `dqn` parameters.
+    discount:
+        Dicount factor of the rfuture rewards.
+    evaluation_mode:
+        Change the way targets are evaluated, either with a target network, or
+        using double q-learning.
+    loss_func:
+        The loss function used between the -values of the action taken and the
+        new target q-values.
+    clip_grad_norm:
+        Optionally clip the norm of the `dqn` gradient before applying them.
+    dtype:
+        Type the observations/model are converted to.
+    device:
+        Device the observations/model are moved to.
+
+    Returns
+    -------
+    trainer:
+        An ignite engine that optimize an deep Q network over a dataset.
+
+    """
+    dqn.to(dtype=dtype, device=device)
+    if target_dqn is not None:
+        target_dqn.to(dtype=dtype, device=device)
+
+    def optimize(engine, batch):
+        batch = batch.to(device=device, dtype=dtype)
+
+        with torch.no_grad():
+            if evaluation_mode == QLearningMode.SIMPLE:
+                # Actions selected and evaluated by model network.
+                dqn.eval()
+                next_vvals = dqn(batch.next_observation).vvalue()
+            elif evaluation_mode == QLearningMode.TARGET:
+                # Actions selected and evaluated by target network.
+                target_dqn.eval()
+                next_vvals = target_dqn(batch.next_observation).vvalue()
+            elif evaluation_mode == QLearningMode.DOUBLE:
+                # Actions selected by model evaluated by target network.
+                target_dqn.eval()
+                actions = dqn(batch.next_observation).greedy()
+                next_vvals = target_dqn(batch.next_observation).get(actions)
+            next_vvals[batch.done.byte()] = 0
+            targets = batch.reward.float() + discount * next_vvals
+
+        dqn.train()
+        qvals = dqn(batch.observation).get(batch.action)
+        loss = loss_func(qvals, targets)
+
+        optimizer.zero_grad()
+        loss.backward()
+        if clip_grad_norm is not None:
+            nn.utils.clip_grad_norm_(dqn.parameters(), clip_grad_norm)
+        optimizer.step()
+
+    return Engine(optimize)
