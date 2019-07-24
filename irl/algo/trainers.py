@@ -144,6 +144,7 @@ def create_qlearning_trainer(
         An ignite engine that optimize an deep Q network over a dataset.
 
     """
+    evaluation_mode = QLearningMode(evaluation_mode)  # Enable str convertion
     dqn.to(dtype=dtype, device=device)
     if target_dqn is not None:
         target_dqn.to(dtype=dtype, device=device)
@@ -165,11 +166,12 @@ def create_qlearning_trainer(
                 target_dqn.eval()
                 actions = dqn(batch.next_observation).greedy()
                 next_vvals = target_dqn(batch.next_observation).get(actions)
-            next_vvals[batch.done.byte()] = 0
-            targets = batch.reward.float() + discount * next_vvals
+            next_vvals = next_vvals.view(-1)
+            next_vvals[batch.done.view(-1).byte()] = 0
+            targets = batch.reward.view(-1).float() + discount * next_vvals.view(-1)
 
         dqn.train()
-        qvals = dqn(batch.observation).get(batch.action)
+        qvals = dqn(batch.observation).get(batch.action).view(-1)
         loss = loss_func(qvals, targets)
 
         optimizer.zero_grad()
