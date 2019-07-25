@@ -141,6 +141,8 @@ def create_memory_qlearner(
         An ignite engine that optimize an deep Q network over a dataset.
 
     """
+    # Enable converting from string
+    evaluation_mode = trainers.QLearningMode(evaluation_mode)
     dqn.to(device=device, dtype=dtype)
     if evaluation_mode == trainers.QLearningMode.SIMPLE:
         target_dqn = None
