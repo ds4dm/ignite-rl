@@ -191,6 +191,7 @@ def create_memory_qlearner(
             dataset=engine.state.memory,
             batch_size=batch_size,
             collate_fn=sample_elem.__class__.collate,
+            shuffle=True,
             drop_last=True,
         )
         engine.state.trainer.run(dataloader)

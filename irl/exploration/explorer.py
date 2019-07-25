@@ -152,7 +152,7 @@ class Explorer(Engine):
         def _init_episode(engine):
             obs = engine.state.env.reset().to(dtype=dtype)
             engine.state.observation = obs
-            engine.state.observation_dev = self._maybe_pin(obs, device)
+            engine.state.observation_dev = obs.to(device=device, non_blocking=True)
 
         if metrics is not None:
             for name, metric in metrics.items():
