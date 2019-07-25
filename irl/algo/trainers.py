@@ -65,22 +65,29 @@ def create_ppo_trainer(
         action_distribs, critic_values = actor_critic(batch.observation)
         log_probs = action_distribs.log_prob(batch.action)
 
-        loss = Firl.ppo_loss(
+        policy_loss = Firl.ppo_loss(
             targets=batch.gae.detach(),
             log_probs=log_probs,
             old_log_probs=batch.log_prob.detach(),
             ppo_clip=ppo_clip,
         )
         entropy_loss = action_distribs.entropy().mean()
-        loss -= exploration_loss_coef * entropy_loss
         critic_loss = critic_loss_function(critic_values.squeeze(1), batch.retrn)
-        loss += critic_loss_coef * critic_loss
+        loss = (
+            policy_loss
+            - exploration_loss_coef * entropy_loss
+            + critic_loss_coef * critic_loss
+        )
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        return loss.item()
+        return {
+            "entropy_loss": entropy_loss.item(),
+            "critic_loss": critic_loss.item(),
+            "policy_loss": policy_loss.item(),
+        }
 
     trainer = Engine(optimize)
     return trainer
@@ -179,5 +186,7 @@ def create_qlearning_trainer(
         if clip_grad_norm is not None:
             nn.utils.clip_grad_norm_(dqn.parameters(), clip_grad_norm)
         optimizer.step()
+
+        return {"loss": loss.item()}
 
     return Engine(optimize)
